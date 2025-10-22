@@ -26,7 +26,6 @@ class Starboard(commands.Cog):
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(all_configs, f, indent=4)
 
-
     @app_commands.command(
         name="starboardsetup",
         description="Setup the starboard channel and emoji"
@@ -42,6 +41,7 @@ class Starboard(commands.Cog):
         await interaction.response.send_message(
             f"Starboard set to {channel.mention} tracking {emoji} reactions!", ephemeral=True
         )
+
     @app_commands.command(
         name="starboardinfo",
         description="Show current starboard settings"
@@ -58,7 +58,6 @@ class Starboard(commands.Cog):
         else:
             await interaction.response.send_message("Starboard is not set up yet.", ephemeral=True)
 
-
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
         if user.bot or reaction.message.guild is None:
@@ -68,42 +67,50 @@ class Starboard(commands.Cog):
         config = self.load_config(guild_id)
         emoji = config.get("emoji")
         channel_id = config.get("channel_id")
-        if str(reaction.emoji) == emoji and channel_id:
-            starboard_channel = self.bot.get_channel(channel_id)
-            if starboard_channel:
-                emoji_count = 0
-                for react in reaction.message.reactions:
-                    if str(react.emoji) == emoji:
-                        emoji_count = react.count
-                        break
+        if str(reaction.emoji) != emoji or not channel_id:
+            return
 
-                embed = discord.Embed(
-                    description=reaction.message.content or "‎", 
-                    color=discord.Color.gold()
-                )
-                embed.set_author(
-                    name=reaction.message.author.display_name,
-                    icon_url=reaction.message.author.display_avatar.url
-                )
+        starboard_channel = self.bot.get_channel(channel_id)
+        if not starboard_channel:
+            return
 
-                embed.add_field(
+        emoji_count = 0
+        for react in reaction.message.reactions:
+            if str(react.emoji) == emoji:
+                emoji_count = react.count
+                break
+
+        async for msg in starboard_channel.history(limit=200):
+            if msg.embeds and msg.embeds[0].footer and msg.embeds[0].footer.text == f"ID:{reaction.message.id}":
+                await msg.edit(content=f"{emoji} {emoji_count}")
+                return
+
+        embed = discord.Embed(
+            description=reaction.message.content or "‎",
+            color=discord.Color.blue()
+        )
+        embed.set_author(
+            name=reaction.message.author.display_name,
+            icon_url=reaction.message.author.display_avatar.url
+        )
+        embed.add_field(
                     name="\u200b",
                     value=".⋆ ˖ ࣪ ⊹ ° ┗━°✦✦⌜星乃一歌⌟✦✦°━┛° ⊹ ࣪ ˖ ⋆.",
                     inline=False
                 )
+        embed.add_field(
+            name="Source",
+            value=f"[Jump!]({reaction.message.jump_url})",
+            inline=False
+        )
+        if reaction.message.attachments:
+            embed.set_image(url=reaction.message.attachments[0].url)
 
-                embed.add_field(
-                    name="Source",
-                    value=f"[Jump!]({reaction.message.jump_url})",
-                    inline=False
-                )
-                embed.set_footer(text=f"{emoji} {emoji_count} • #{reaction.message.channel.name}")
+        timestamp = reaction.message.created_at.strftime("%Y-%m-%d %H:%M")  # UTC time
+        channel_name = reaction.message.channel.name
+        embed.set_footer(text=f"Sent: {timestamp} | Channel: #{channel_name}")
 
-                if reaction.message.attachments:
-                    embed.set_image(url=reaction.message.attachments[0].url)
-
-                await starboard_channel.send(embed=embed)
-
+        await starboard_channel.send(content=f"{emoji} {emoji_count}", embed=embed)
 
 
 async def setup(bot):
