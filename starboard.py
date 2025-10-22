@@ -71,7 +71,6 @@ class Starboard(commands.Cog):
         if str(reaction.emoji) == emoji and channel_id:
             starboard_channel = self.bot.get_channel(channel_id)
             if starboard_channel:
-                # Count tracked emoji reactions
                 emoji_count = 0
                 for react in reaction.message.reactions:
                     if str(react.emoji) == emoji:

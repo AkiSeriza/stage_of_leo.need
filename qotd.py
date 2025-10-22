@@ -42,13 +42,13 @@ class QOTD(commands.Cog):
     def cog_unload(self):
         self.check_qotd_time.cancel()
 
-        def load_json(self, file):
-            if not os.path.exists(file):
-                os.makedirs(os.path.dirname(file), exist_ok=True)
-                with open(file, "w") as f:
-                    json.dump({}, f)
-            with open(file, "r") as f:
-                return json.load(f)
+    def load_json(self, file):
+        if not os.path.exists(file):
+            os.makedirs(os.path.dirname(file), exist_ok=True)
+            with open(file, "w") as f:
+                json.dump({}, f)
+        with open(file, "r") as f:
+            return json.load(f)
 
     def save_json(self, file, data):
         with open(file, "w") as f:
