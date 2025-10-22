@@ -21,7 +21,8 @@ async def on_ready():
 extensions = [
     "radio",
     "fun",
-    "qotd"
+    "qotd",
+    "starboard"
 ]
 
 async def load_extensions():
