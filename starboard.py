@@ -13,6 +13,7 @@ class Starboard(commands.Cog):
         if not os.path.exists(DB_FILE):
             with open(DB_FILE, "w", encoding="utf-8") as f:
                 json.dump({}, f)
+        self.starboard_messages = {}
 
     def load_config(self, guild_id):
         with open(DB_FILE, "r", encoding="utf-8") as f:
@@ -80,10 +81,14 @@ class Starboard(commands.Cog):
                 emoji_count = react.count
                 break
 
-        async for msg in starboard_channel.history(limit=200):
-            if msg.embeds and msg.embeds[0].footer and msg.embeds[0].footer.text == f"ID:{reaction.message.id}":
-                await msg.edit(content=f"{emoji} {emoji_count}")
+        star_msg_id = self.starboard_messages.get(reaction.message.id)
+        if star_msg_id:
+            try:
+                star_msg = await starboard_channel.fetch_message(star_msg_id)
+                await star_msg.edit(content=f"{emoji} {emoji_count}")
                 return
+            except discord.NotFound:
+                del self.starboard_messages[reaction.message.id]
 
         embed = discord.Embed(
             description=reaction.message.content or "‎",
@@ -96,21 +101,21 @@ class Starboard(commands.Cog):
         if reaction.message.attachments:
             embed.set_image(url=reaction.message.attachments[0].url)
         embed.add_field(
-                    name="\u200b",
-                    value=".⋆ ˖ ࣪ ⊹ ° ┗━°✦✦⌜星乃一歌⌟✦✦°━┛° ⊹ ࣪ ˖ ⋆.",
-                    inline=False
-                )
+            name="\u200b",
+            value=".⋆ ˖ ࣪ ⊹ ° ┗━°✦✦⌜星乃一歌⌟✦✦°━┛° ⊹ ࣪ ˖ ⋆.",
+            inline=False
+        )
         embed.add_field(
             name="Source",
             value=f"[Jump!]({reaction.message.jump_url})",
             inline=False
         )
 
-        timestamp = reaction.message.created_at.strftime("%Y-%m-%d %H:%M")  # UTC time
+        timestamp = reaction.message.created_at.strftime("%Y-%m-%d %H:%M")
         channel_name = reaction.message.channel.name
         embed.set_footer(text=f"Sent: {timestamp} | Channel: #{channel_name}")
-
-        await starboard_channel.send(content=f"{emoji} {emoji_count}", embed=embed)
+        star_msg = await starboard_channel.send(content=f"{emoji} {emoji_count}", embed=embed)
+        self.starboard_messages[reaction.message.id] = star_msg.id
 
 
 async def setup(bot):
