@@ -93,6 +93,8 @@ class Starboard(commands.Cog):
             name=reaction.message.author.display_name,
             icon_url=reaction.message.author.display_avatar.url
         )
+        if reaction.message.attachments:
+            embed.set_image(url=reaction.message.attachments[0].url)
         embed.add_field(
                     name="\u200b",
                     value=".⋆ ˖ ࣪ ⊹ ° ┗━°✦✦⌜星乃一歌⌟✦✦°━┛° ⊹ ࣪ ˖ ⋆.",
@@ -103,8 +105,6 @@ class Starboard(commands.Cog):
             value=f"[Jump!]({reaction.message.jump_url})",
             inline=False
         )
-        if reaction.message.attachments:
-            embed.set_image(url=reaction.message.attachments[0].url)
 
         timestamp = reaction.message.created_at.strftime("%Y-%m-%d %H:%M")  # UTC time
         channel_name = reaction.message.channel.name
