@@ -1,3 +1,5 @@
+radio_active = False
+
 import os
 import random
 import asyncio
@@ -61,6 +63,8 @@ async def type_autocomplete(interaction: discord.Interaction, current: str):
 class Radio(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        global radio_active
+        radio_active = False
     def resolve_unit_folder(self, unit: str):
         if not os.path.exists(SONGS_FOLDER):
             return unit
@@ -136,6 +140,7 @@ class Radio(commands.Cog):
 
     @app_commands.command(name="radio", description="Start music radio loop")
     async def radio(self, interaction: discord.Interaction):
+        global radio_active
         if not interaction.user.voice:
             await interaction.response.send_message("<:ichisip:1365858916361306192> You are not connected to a voice channel.")
             return
@@ -143,6 +148,7 @@ class Radio(commands.Cog):
         vc = interaction.guild.voice_client or await interaction.user.voice.channel.connect()
         await self.play_next(vc)
         await interaction.response.send_message("<:ichiganba:1381502507225710716> Started radio loop.")
+        radio_active = True
 
     @app_commands.command(name="skip", description="Skip the current song")
     async def skip(self, interaction: discord.Interaction):
@@ -155,10 +161,12 @@ class Radio(commands.Cog):
 
     @app_commands.command(name="stop", description="Stop music and disconnect")
     async def stop(self, interaction: discord.Interaction):
+        global radio_active
         vc = interaction.guild.voice_client
         if vc:
             await vc.disconnect()
             await interaction.response.send_message("<:ichiheart:1384047120704602112> Disconnected.")
+            radio_active = False
         else:
             await interaction.response.send_message("<:ichisip:1365858916361306192> Not in a voice channel.")
 
