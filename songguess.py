@@ -73,14 +73,13 @@ class SongGuess(commands.Cog):
     async def guesssong(self, interaction: discord.Interaction):
         global song_guess
         global radio_active
-        song_guess = True
         guild_id = interaction.guild_id
 
         if radio_active:
             return await interaction.response.send_message("Radio is active — can't start song guessing.")
         if self.active_games.get(guild_id) or song_guess:
             return await interaction.response.send_message("Song Guess is already running!")
-
+        song_guess = True
         config = self.config.get(guild_id)
         if not config:
             return await interaction.response.send_message("Please run `/songguessconfig` first!")
