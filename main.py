@@ -23,7 +23,7 @@ extensions = [
     "fun",
     "qotd",
     "starboard",
-    "songguess"
+    #"songguess"
 ]
 
 async def load_extensions():
