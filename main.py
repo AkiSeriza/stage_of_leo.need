@@ -22,7 +22,8 @@ extensions = [
     "radio",
     "fun",
     "qotd",
-    "starboard"
+    "starboard",
+    "songguess"
 ]
 
 async def load_extensions():
