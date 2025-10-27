@@ -6,6 +6,7 @@ import asyncio
 import discord
 from discord import app_commands
 from discord.ext import commands
+from songguess import song_guess
 
 
 SONGS_FOLDER = "Songs"
@@ -141,6 +142,14 @@ class Radio(commands.Cog):
     @app_commands.command(name="radio", description="Start music radio loop")
     async def radio(self, interaction: discord.Interaction):
         global radio_active
+        global song_guess
+
+        if song_guess:  
+            await interaction.response.send_message(
+                "<:ichiyelp:1419613277662482472> Cannot start radio while Song Guess game is active.",
+                ephemeral=True
+            )
+            return
         if not interaction.user.voice:
             await interaction.response.send_message("<:ichisip:1365858916361306192> You are not connected to a voice channel.")
             return
@@ -218,7 +227,13 @@ class Radio(commands.Cog):
     )
     async def request(self, interaction: discord.Interaction, unit: str, song: str, song_type: str = "Normal"):
         global queue
-
+        global song_guess
+        if song_guess:
+            await interaction.response.send_message(
+                "<:ichiyelp:1419613277662482472> Cannot add songs while Song Guess game is active.",
+                ephemeral=True
+            )
+            return
         vc = interaction.guild.voice_client
         if not vc:
             await interaction.response.send_message("<:ichisip:1365858916361306192> Bot is not connected to a voice channel.")
