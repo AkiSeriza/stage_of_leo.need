@@ -7,7 +7,7 @@ from discord.ext import commands
 
 
 SONGS_FOLDER = "Songs"
-QUEUE_LIMIT = 5
+QUEUE_LIMIT = 7
 
 
 queue = [] 

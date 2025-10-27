@@ -170,12 +170,51 @@ class QOTD(commands.Cog):
                 guild = self.bot.get_guild(int(guild_id))
                 if guild:
                     await self.send_qotd(guild)
-                await asyncio.sleep(60)
 
     @check_qotd_time.before_loop
     async def before_check_qotd_time(self):
         await self.bot.wait_until_ready()
 
+    @app_commands.command(name="togglerp", description="Gain or Remove the RP role for access to roleplay channels.")
+    async def joinrp(self, interaction: discord.Interaction):
+        guild = interaction.guild
+        role = discord.utils.get(guild.roles, name="RP")
+        if not role:
+            await interaction.response.send_message("<:ichisip:1365858916361306192> RP role does not exist.", ephemeral=True)
+            return
+        member = interaction.user
+        if role in member.roles:
+            await interaction.response.send_message("<:ichisip:1365858916361306192> You already have the RP role.", ephemeral=True)
+            await member.remove_roles(role, reason="User opted out of RP role.")
+            return
+        await member.add_roles(role, reason="User opted in to RP role.")
+        await interaction.response.send_message("<:ichiheart:1384047120704602112> You have been given the RP role!", ephemeral=True)
+
+    @app_commands.command(name="qotdlog", description="See data about the QOTDs sent in this server.")
+    async def qotdlog(self, interaction: discord.Interaction):
+        sent = self.load_json(SENT_FILE)
+        suggestions = self.load_json(SUGGESTIONS_FILE)
+        suggestcount = len(suggestions.get(str(interaction.guild.id), []))
+        if str(interaction.guild.id) not in sent or len(sent[str(interaction.guild.id)]) == 0:
+            await interaction.response.send_message("<:ichisip:1365858916361306192> No QOTDs have been sent in this server yet.", ephemeral=True)
+            return
+
+        log_entries = sent[str(interaction.guild.id)]
+        embed = discord.Embed(
+            title="QOTD Log",
+            color=discord.Color.blurple()
+        )
+
+        for entry in log_entries[-10:]:
+            embed.add_field(
+                name=f"#{entry['ordinal']} - {entry['date']}",
+                value=f"**Question:** {entry['question']}\n**Suggested by:** {entry['author']}",
+                inline=False
+            )
+        footer = "{suggestcount} more custom QOTDs pending" if suggestcount > 0 else "No pending custom QOTDs."
+        embed.set_footer(text=f"{footer}")
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(QOTD(bot))
