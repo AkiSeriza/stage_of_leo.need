@@ -205,13 +205,13 @@ class QOTD(commands.Cog):
             color=discord.Color.blurple()
         )
 
-        for entry in log_entries[-10:]:
+        for entry in log_entries[-3:]:
             embed.add_field(
                 name=f"#{entry['ordinal']} - {entry['date']}",
-                value=f"**Question:** {entry['question']}\n**Suggested by:** {entry['author']}",
+                value=f"**Question:** {entry['question']}\n**Suggested by:** {entry['author']} \n\n",
                 inline=False
             )
-        footer = "{suggestcount} more custom QOTDs pending" if suggestcount > 0 else "No pending custom QOTDs."
+        footer = f"{suggestcount} more custom QOTDs pending" if suggestcount > 0 else "No pending custom QOTDs."
         embed.set_footer(text=f"{footer}")
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
