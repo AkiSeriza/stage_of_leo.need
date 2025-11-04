@@ -127,6 +127,12 @@ class Fun(commands.Cog):
     @app_commands.command(name="ichikamention", description="ICHIKA HOSHINO MENTIONED?!")
     async def slash_copypasta(self, interaction: discord.Interaction):
         await interaction.response.send_message(
+            "MINORI?????????????? Minori Hanasato mentioned??????? Have I said that I L-O-V-E Minori Hanasato 🌸 from the hit game Project Sekai: Colorful Stage! feat. Minori Hanasato 🌸? So, I love Minori Hanasato 🌸 from the hit game Project Sekai: Colorful Stage! feat. Minori Hanasato 🌸. Yes, now you know, that I love Minori Hanasato 🌸 from the hit game Project Sekai: Colorful Stage! feat. Minori Hanasato 🌸. \n Minori Hanasato 🌸 is the best idol in the game. She's so resilient and strong. Minori 🌸 has failed many times but never gave up. Minori 🌸 is the light in a sea of darkness. Minori 🌸 can save peoples, states, societies, continents, Earth, Sun, stars, galaxies, the Universe by her singing and dancing. Minori Hanasato 🌸 is Love. Minori Hanasato 🌸 gives Hope. Minori Hanasato 🌸 represents the Life.  \n Be a Minori 🌸 fan today!~ 🌸 🌸 🌸 🌸 🌸 🌸 🌸"
+        )
+    
+    @app_commands.command(name="minorimention", description="MINORI HANASATO MENTIONED?!")
+    async def slash_copypasta(self, interaction: discord.Interaction):
+        await interaction.response.send_message(
             "ICHIKA HOSHINO MENTIONED?! Oh Ichika, you are the love of my life. It's been 3 years ever since i have laid my eyes upon you... Your captivating and amazing voice is music in my ears, your eyes shine like the most beautiful of galaxies out there and your looks are the most exquisite and gorgeous ones i can ever find... Oh, you are my reason to wake up, to eat, to walk, to play pjsk, to grind for your rank, to go to school, to study and to sleep. You are the most precious being in the entire world and you are NOT just a fictional character to me... You are the reason how i see the world now, your presence changed everything for me and i'm so thankful that you exist in this world... You are the most amazing, beautiful, pretty, gorgeous, jaw-dropping, cute, adorable, whimsical, exquisite and loving character to exist ever..."
         )
 class AnthologyView(discord.ui.View):
@@ -155,10 +161,6 @@ class AnthologyView(discord.ui.View):
         self.index = (self.index + 1) % len(self.pages)
         await self.update_embed(interaction)
 
-    @discord.ui.button(label="Close", style=discord.ButtonStyle.red)
-    async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.message.delete()
-        self.stop()
 
 
 
