@@ -4,8 +4,8 @@ from discord.ext import commands
 import json
 import os
 
-DB_FILE = r"Databases\ichika_anthology.json"
-
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_FILE = os.path.join(BASE_DIR, "Databases", "ichika_anthology.json")
 
 class Fun(commands.Cog):
     def __init__(self, bot):
@@ -35,7 +35,7 @@ class Fun(commands.Cog):
 
         if user_id in self.database:
             await interaction.response.send_message(
-                f"{username}, you already have a page in the anthology! Use `/ichianthalogysearch {username}` to see it.",
+                f"{username}, you already have a page in the anthology! Use `/ichianthologysearch {username}` to see it.",
                 ephemeral=True,
             )
             return
@@ -77,7 +77,7 @@ class Fun(commands.Cog):
     async def ichianthology(self, interaction: discord.Interaction):
         if not self.database:
             await interaction.response.send_message(
-                "<:ichishy:1419613335363522571> The anthology is currently empty. Be the first to write with `/ichianthalogyadd`!"
+                "<:ichishy:1419613335363522571> The anthology is currently empty. Be the first to write with `/ichianthologyadd`!"
             )
             return
 
@@ -99,7 +99,7 @@ class Fun(commands.Cog):
         description="Jump directly to someone's page in the anthology",
     )
     @app_commands.describe(username="The username to search for")
-    async def ichianthalogysearch(self, interaction: discord.Interaction, username: str):
+    async def ichianthologysearch(self, interaction: discord.Interaction, username: str):
         matches = [v for v in self.database.values() if v["username"].lower() == username.lower()]
 
         if not matches:
@@ -115,7 +115,7 @@ class Fun(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="ichianthologyclear", description="Clear your entry from Ichika Anthology")
-    async def ichianthalogyclear(self, interaction: discord.Interaction):
+    async def ichianthologyclear(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
         if user_id in self.database:
             del self.database[user_id]
