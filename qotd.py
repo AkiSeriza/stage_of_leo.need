@@ -212,7 +212,8 @@ class QOTD(commands.Cog):
                 inline=False
             )
         footer = f"{suggestcount} more custom QOTDs pending" if suggestcount > 0 else "No pending custom QOTDs."
-        embed.set_footer(text=f"{footer}")
+        killme = footer
+        embed.set_footer(text=f"{killme}")
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 

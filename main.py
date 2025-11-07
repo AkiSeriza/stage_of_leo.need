@@ -24,6 +24,7 @@ extensions = [
     "qotd",
     "starboard",
     #"songguess"
+    'tierlist'
 ]
 
 async def load_extensions():
