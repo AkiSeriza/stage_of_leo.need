@@ -26,6 +26,7 @@ def ensure_vote_file():
 def load_votes():
     return load_json(VOTES_PATH)
 
+
 def save_votes(data):
     save_json(VOTES_PATH, data)
 
@@ -48,9 +49,13 @@ DEFAULT_SCORES = {
 }
 
 def ensure_dirs():
+    print("[DEBUG] Ensuring directories exist")
     DB_DIR.mkdir(parents=True, exist_ok=True)
     if not SONG_LIST_PATH.exists():
+        print(f"[DEBUG] Creating new empty song list at {SONG_LIST_PATH}")
         SONG_LIST_PATH.write_text("{}")
+    else:
+        print(f"[DEBUG] Song list exists at {SONG_LIST_PATH}")
     if not SONG_SCORES_PATH.exists():
         SONG_SCORES_PATH.write_text("{}")
     if not SERVER_SETUP_PATH.exists():
@@ -61,10 +66,14 @@ def ensure_dirs():
         ACTIVE_VOTES_PATH.write_text("{}")
 
 def load_json(path: Path):
+    print(f"[DEBUG] Loading JSON from {path}")
     try:
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
+            data = json.load(f)
+            print(f"[DEBUG] Loaded data: {data}")
+            return data
+    except Exception as e:
+        print(f"[DEBUG] Error loading {path}: {str(e)}")
         return {}
 
 def save_json(path: Path, data):
@@ -226,14 +235,20 @@ def write_tier_csv(server_id: str, tiers: Dict[str,List[Dict]]):
     csv_path.write_text("\n".join(csv_lines), encoding='utf-8')
 
 def get_next_song_for_server(server_id: str):
+    print(f"[DEBUG] Getting next song for server {server_id}")
     setups = load_json(SERVER_SETUP_PATH)
+    print(f"[DEBUG] Loaded server setups: {setups}")
     setups.setdefault(server_id, {})
     cfg = setups[server_id]
     idx = cfg.get("index", 0)
+    print(f"[DEBUG] Current index: {idx}")
     songs = list(load_json(SONG_LIST_PATH).keys())
+    print(f"[DEBUG] Available songs: {songs}")
     if not songs:
+        print("[DEBUG] No songs found in song list!")
         return None
     song_key = songs[idx % len(songs)]
+    print(f"[DEBUG] Selected song: {song_key}")
     cfg["index"] = (idx + 1) % len(songs)
     setups[server_id] = cfg
     save_json(SERVER_SETUP_PATH, setups)
@@ -409,7 +424,7 @@ class TierListCog(commands.Cog):
         out_lines = []
         with open(tier_csv, newline='', encoding='utf-8') as f:
             csv_reader = csv.reader(f)
-            next(csv_reader, None)  # Skip header row
+            next(csv_reader, None)
             current_tier = None
             for tier, name, avg, total, votes in csv_reader:
                 if tier != current_tier:
@@ -466,13 +481,17 @@ class TierListCog(commands.Cog):
     @app_commands.command(name="forcedailypost", description="Force the next daily tierlist post to send immediately and advance the list.")
     @app_commands.checks.has_permissions(administrator=True)
     async def force_daily_post(self, interaction: discord.Interaction):
+        print(f"[DEBUG] Force daily post triggered")
         sid = interaction.guild_id
+        print(f"[DEBUG] Server ID: {sid}")
         if not sid:
             await interaction.response.send_message("This command must be used in a server.", ephemeral=True)
             return
 
         sid_str = str(sid)
+        print(f"[DEBUG] Loading server setup for ID {sid_str}")
         setups = load_json(SERVER_SETUP_PATH)
+        print(f"[DEBUG] Server setups loaded: {setups}")
         cfg = setups.get(sid_str, {})
 
         channel_id = cfg.get("Channel")
