@@ -1,222 +1,185 @@
 import discord
-from discord.ext import commands, tasks
 from discord import app_commands
-import json
-import asyncio
-from datetime import datetime
-import pytz
+from discord.ext import commands    
 import os
+import json
+import datetime
 import random
+from logger import log
+from discord.ext import tasks
 
-SETTINGS_FILE = "Databases/qotd_settings.json"
-SUGGESTIONS_FILE = "Databases/qotd_suggestions.json"
-SENT_FILE = "Databases/qotd_sent.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+QOTD_FOLDER = os.path.join(BASE_DIR, "Databases", "QOTD")
+PHOTO_FOLDER = os.path.join(BASE_DIR, "Databases", "Photos")
+expected_files = ["suggestions.json", "log.json"]
 
-
-class QOTDRoleButton(discord.ui.View):
-    def __init__(self, role: discord.Role):
-        super().__init__(timeout=None)
-        self.role = role
-
-    @discord.ui.button(label="Toggle QOTD Role", style=discord.ButtonStyle.blurple)
-    async def toggle_role(self, interaction: discord.Interaction, button: discord.ui.Button):
-        member = interaction.user
-        role = self.role
-
-        if role in member.roles:
-            await member.remove_roles(role, reason="User opted out of QOTD role.")
-            await interaction.response.send_message(
-                f"You’ve been **removed** from {role.mention}.", ephemeral=True
-            )
-        else:
-            await member.add_roles(role, reason="User opted in to QOTD role.")
-            await interaction.response.send_message(
-                f"You’ve been **added** to {role.mention}!", ephemeral=True
-            )
 
 class QOTD(commands.Cog):
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot):
         self.bot = bot
-        self.check_qotd_time.start()
+        self.check_server_folders()
+        self.daily_send.start()
 
-    def cog_unload(self):
-        self.check_qotd_time.cancel()
-
-    def load_json(self, file):
-        if not os.path.exists(file):
-            os.makedirs(os.path.dirname(file), exist_ok=True)
-            with open(file, "w") as f:
-                json.dump({}, f)
-        with open(file, "r") as f:
+    def check_server_folders(self):
+        self.global_server_data = self.load_global_server_info()
+        self.server_ids = list(self.global_server_data.keys())
+        for i in self.server_ids:
+            server_folders = os.path.join(QOTD_FOLDER, i)
+            if not os.path.exists(server_folders):
+                os.makedirs(server_folders)
+            for j in expected_files:
+                if not os.path.exists(os.path.join(server_folders, j)):
+                    with open(os.path.join(server_folders, j), "w") as f:
+                        json.dump({}, f, indent=4)
+    
+    def load_global_server_info(self):
+        servers = os.path.join(QOTD_FOLDER, "qotd_servers.json")
+        if not os.path.exists(servers):
+            with open(servers, "w") as f:
+                json.dump({}, f, indent=4)
+        with open(servers, "r") as f:
             return json.load(f)
-
-    def save_json(self, file, data):
-        with open(file, "w") as f:
-            json.dump(data, f, indent=4)
-
-    async def send_qotd(self, guild: discord.Guild):
-        settings = self.load_json(SETTINGS_FILE)
-        suggestions = self.load_json(SUGGESTIONS_FILE)
-        sent = self.load_json(SENT_FILE)
-
-        if str(guild.id) not in settings:
+    
+    async def send_qotd(self, server_id, interaction):
+        suggestion_file = os.path.join(QOTD_FOLDER, server_id, "suggestions.json")
+        log_file = os.path.join(QOTD_FOLDER, server_id, "log.json")
+        today = datetime.datetime.today()
+        formatted = today.strftime("%Y-%m-%d") 
+        channel_id = self.global_server_data[server_id]["channel_id"]
+        channel = interaction.guild.get_channel(channel_id)
+        with open(suggestion_file,"r") as f:
+            suggest_file_open = json.load(f)
+        keys = list(suggest_file_open.keys())
+        if not keys:
+            await channel.send("No more QOTD, use /qotdsuggest to suggest some!")
             return
-
-        data = settings[str(guild.id)]
-        channel_id = data.get("channel_id")
-        role_id = data.get("role_id") 
-        time_str = data.get("time")
-
-        channel = guild.get_channel(channel_id)
-        if not channel:
-            return
-
-        role = guild.get_role(role_id) if role_id else None
-
-        if len(suggestions.get(str(guild.id), [])) == 0:
-            await channel.send("<:ichiyelp:1419613277662482472> No QOTD suggestions available!")
-            return
-
-        index = random.randint(0, len(suggestions[str(guild.id)]) - 1)
-        suggestion = suggestions[str(guild.id)].pop(index)
-        self.save_json(SUGGESTIONS_FILE, suggestions)
-
+        today_selected = random.choice(keys)
+        with open(log_file, "r") as f:
+            log_file_open = json.load(f)
+        selected = {}
+        selected["question"] = suggest_file_open[today_selected]["suggestion"]
+        selected["suggestor"] = suggest_file_open[today_selected]["suggestor"]
+        selected["time"] = suggest_file_open[today_selected]["time"]
+        self.check_server_folders()
+        index = self.global_server_data[server_id]["index"]
+        log_file_open[index] = selected
+        suggest_file_open.pop(today_selected)
+        with open(suggestion_file,"w", encoding="utf-8") as f:
+            json.dump(suggest_file_open, f, indent=4)
+        with open(log_file,"w", encoding="utf-8") as f:
+            json.dump(log_file_open, f, indent=4)
         embed = discord.Embed(
-            title="<:ichiheart:1384047120704602112> Question of the Day!",
-            description=f"**{suggestion['question']}**",
-            color=discord.Color.blurple(),
-            timestamp=datetime.utcnow()
+            color=0x4169E1, 
+            description= f"**<:ichiheart:1384047120704602112> Question of the Day #{index} for {formatted}**")
+        self.global_server_data[server_id]["index"] += 1
+        servers_file = os.path.join(QOTD_FOLDER, "qotd_servers.json")
+        with open(servers_file, "w", encoding="utf-8") as f:
+            json.dump(self.global_server_data, f, indent=4)
+        role = self.global_server_data[server_id]["role"]
+        embed.add_field(name=selected["question"], value=".⋆ ˖ ࣪ ⊹ ° ┗━°✦✦⌜星乃一歌⌟✦✦°━┛° ⊹ ࣪ ˖ ⋆.", inline=False)
+        member = interaction.guild.get_member(selected["suggestor"])
+        if not member: 
+            try:
+                member = await self.bot.fetch_user(selected["suggestor"])
+            except:
+                member = None
+
+        member_name = member.display_name if member else f"User ID {selected['suggestor']}"
+        embed.set_footer(text=f"Suggested by {member_name} on {selected["time"]}")
+        await channel.send(f"<@&{role}>")
+        message = await channel.send(embed=embed)
+        thread = await message.create_thread(
+            name=f"Daily Question of the Day #{index}",
+            auto_archive_duration=1440,
+            reason="Daily QOTD discussion thread"
         )
-        embed.set_footer(text=f"Suggested by {suggestion['author']}")
-
-        content = role.mention if role else None
-
-        view = QOTDRoleButton(role) if role else None
-
-        await channel.send(content=content, embed=embed, view=view)
-
-        date_str = datetime.now(pytz.timezone("US/Pacific")).strftime("%Y-%m-%d")
-        if str(guild.id) not in sent:
-            sent[str(guild.id)] = []
-        sent[str(guild.id)].append({
-            "date": date_str,
-            "question": suggestion['question'],
-            "author": suggestion['author'],
-            "ordinal": len(sent[str(guild.id)]) + 1
-        })
-        self.save_json(SENT_FILE, sent)
-
-    @app_commands.command(name="qotdsetup", description="Set up the QOTD channel, role, and daily send time (PST, 24h format).")
-    @app_commands.describe(
-        channel="The channel to post QOTDs in.",
-        role="The role to ping and toggle (e.g., @qotd).",
-        time_24h="Time in PST (24-hour format, e.g. 18:00)."
-    )
-    @app_commands.checks.has_permissions(administrator=True)
-    async def qotdsetup(self, interaction: discord.Interaction, channel: discord.TextChannel, role: discord.Role, time_24h: str):
-        settings = self.load_json(SETTINGS_FILE)
-        settings[str(interaction.guild.id)] = {
-            "channel_id": channel.id,
-            "role_id": role.id,
-            "time": time_24h
-        }
-        self.save_json(SETTINGS_FILE, settings)
-
-        await interaction.response.send_message(
-            f"<:ichiheart:1384047120704602112> QOTD setup complete!\n"
-            f"Questions will post in {channel.mention} at **{time_24h} PST**, and ping {role.mention}.",
-            ephemeral=True
-        )
-
-    @app_commands.command(name="qotdsuggest", description="Suggest a Question of the Day.")
-    @app_commands.describe(question="Your question suggestion.")
-    async def qotdsuggest(self, interaction: discord.Interaction, question: str):
-        settings = self.load_json(SETTINGS_FILE)
-        if str(interaction.guild.id) not in settings:
-            await interaction.response.send_message("<:ichisip:1365858916361306192> QOTD is not set up in this server yet.", ephemeral=True)
-            return
-
-        suggestions = self.load_json(SUGGESTIONS_FILE)
-        if str(interaction.guild.id) not in suggestions:
-            suggestions[str(interaction.guild.id)] = []
-
-        suggestions[str(interaction.guild.id)].append({
-            "author": str(interaction.user),
-            "question": question
-        })
-
-        self.save_json(SUGGESTIONS_FILE, suggestions)
-        await interaction.response.send_message("<:ichiheart:1384047120704602112> Your QOTD suggestion has been added!", ephemeral=True)
-
-    @app_commands.command(name="qotdforce", description="Force send a QOTD immediately.")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def qotdforce(self, interaction: discord.Interaction):
-        settings = self.load_json(SETTINGS_FILE)
-        if str(interaction.guild.id) not in settings:
-            await interaction.response.send_message("<:ichisip:1365858916361306192> QOTD is not set up in this server yet.", ephemeral=True)
-            return
-
-        await self.send_qotd(interaction.guild)
-        await interaction.response.send_message("<:ichiheart:1384047120704602112> QOTD sent successfully!", ephemeral=True)
 
     @tasks.loop(minutes=1)
-    async def check_qotd_time(self):
-        now_pst = datetime.now(pytz.timezone("US/Pacific"))
-        current_time = now_pst.strftime("%H:%M")
+    async def daily_send(self):
+        now = datetime.datetime.utcnow() 
+        for server_id, data in self.global_server_data.items():
+            if "time" not in data or "channel_id" not in data:
+                continue
+            target_time = data["time"]
+            target_hour = int(target_time[:2])
+            target_minute = int(target_time[2:])
+            pacific_now = datetime.datetime.utcnow() - datetime.timedelta(hours=7) 
+            if pacific_now.hour == target_hour and pacific_now.minute == target_minute:
+                try:
+                    guild = self.bot.get_guild(int(server_id))
+                    if guild:
+                        class DummyInteraction:
+                            def __init__(self, guild):
+                                self.guild = guild
+                                self.user = None
+                                self.response = None
+                        interaction = DummyInteraction(guild)
+                        await self.send_qotd(server_id, interaction)
+                except Exception as e:
+                    print(f"Failed to send QOTD for {server_id}: {e}")
 
-        settings = self.load_json(SETTINGS_FILE)
-        for guild_id, data in settings.items():
-            if data["time"] == current_time:
-                guild = self.bot.get_guild(int(guild_id))
-                if guild:
-                    await self.send_qotd(guild)
-
-    @check_qotd_time.before_loop
-    async def before_check_qotd_time(self):
-        await self.bot.wait_until_ready()
-
-    @app_commands.command(name="togglerp", description="Gain or Remove the RP role for access to roleplay channels.")
-    async def joinrp(self, interaction: discord.Interaction):
-        guild = interaction.guild
-        role = discord.utils.get(guild.roles, name="RP")
-        if not role:
-            await interaction.response.send_message("<:ichisip:1365858916361306192> RP role does not exist.", ephemeral=True)
-            return
-        member = interaction.user
-        if role in member.roles:
-            await interaction.response.send_message("<:ichisip:1365858916361306192> You already have the RP role.", ephemeral=True)
-            await member.remove_roles(role, reason="User opted out of RP role.")
-            return
-        await member.add_roles(role, reason="User opted in to RP role.")
-        await interaction.response.send_message("<:ichiheart:1384047120704602112> You have been given the RP role!", ephemeral=True)
-
-    @app_commands.command(name="qotdlog", description="See data about the QOTDs sent in this server.")
-    async def qotdlog(self, interaction: discord.Interaction):
-        sent = self.load_json(SENT_FILE)
-        suggestions = self.load_json(SUGGESTIONS_FILE)
-        suggestcount = len(suggestions.get(str(interaction.guild.id), []))
-        if str(interaction.guild.id) not in sent or len(sent[str(interaction.guild.id)]) == 0:
-            await interaction.response.send_message("<:ichisip:1365858916361306192> No QOTDs have been sent in this server yet.", ephemeral=True)
-            return
-
-        log_entries = sent[str(interaction.guild.id)]
-        embed = discord.Embed(
-            title="QOTD Log",
-            color=discord.Color.blurple()
-        )
-
-        for entry in log_entries[-3:]:
-            embed.add_field(
-                name=f"#{entry['ordinal']} - {entry['date']}",
-                value=f"**Question:** {entry['question']}\n**Suggested by:** {entry['author']} \n\n",
-                inline=False
+    @app_commands.command(
+            name="qotdsetup", description="Setup QOTD funtionality for the server"
             )
-        footer = f"{suggestcount} more custom QOTDs pending" if suggestcount > 0 else "No pending custom QOTDs."
-        killme = footer
-        embed.set_footer(text=f"{killme}")
+    @app_commands.describe(
+        channel = "Channel where the QOTD is sent",
+        time = "Time in US Pacific time to send the QOTD (24H format eg. 1800)",
+        role = "Role to ping when QOTD comes (Optional)"
+        )
+    @app_commands.checks.has_permissions(administrator=True)
+    async def qotdsetup(self, interaction: discord.Interaction, channel: discord.TextChannel, time: str, role: discord.Role = None):
+        file = discord.File(os.path.join(PHOTO_FOLDER,"Ichika_think.jpg"), filename="Ichika_think.jpg")
+        embed = discord.Embed(
+            color=0x4169E1,
+            description= "Setup Complete!"
+        )
+        embed.set_thumbnail(url="attachment://Ichika_think.jpg")
+        embed.add_field(name="Channel", value=channel, inline=True)
+        embed.add_field(name="Role", value=role if role else "None", inline=True)
+        embed.add_field(name="Time", value=time, inline=True)
+        await interaction.response.send_message(embed=embed, file = file , ephemeral=True)
+        server_id = str(interaction.guild.id)
+        self.global_server_data.setdefault(server_id, {})
+        self.global_server_data[server_id]["channel_id"] = channel.id
+        self.global_server_data[server_id]["time"] = time
+        self.global_server_data[server_id]["role"] = role.id if role else None
+        self.global_server_data[server_id]["index"] = 1        
+        with open(os.path.join(QOTD_FOLDER, "qotd_servers.json"), "w", encoding="utf-8") as f:
+            json.dump(self.global_server_data, f, indent = 4)
+        self.check_server_folders()
 
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+    @app_commands.command(name="qotdsuggest", description="Suggest a QOTD to the server")
+    @app_commands.describe(suggestion = "Your Suggestion here")
+    async def qotdsuggest(self, interaction: discord.Interaction, suggestion: str):
+        now = datetime.datetime.now()
+        formatted = now.strftime("%Y-%m-%d %H:%M:%S") 
+        server = str(interaction.guild_id)
+        message_id = str(interaction.id)
+        server_file= os.path.join(QOTD_FOLDER, server, "suggestions.json")
+        suggestionF = {}
+        suggestionF.setdefault(message_id, {})
+        suggestionF["suggestor"] = interaction.user.id
+        suggestionF["suggestion"] = suggestion
+        suggestionF["time"] = formatted
+        with open(server_file, "r",encoding="utf-8") as f:
+            temp_server_suggestions = json.load(f)
+        temp_server_suggestions[message_id] = suggestionF
+        with open(server_file, "w",encoding="utf-8") as f:
+            json.dump(temp_server_suggestions, f, indent=4)
+        await interaction.response.send_message("<:ichiheart:1384047120704602112> Thank you for the suggestion!",ephemeral=True)
+    
+    @app_commands.command(name="qotdforce", description="Force to send a QOTD")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def qotdforce(self, interaction: discord.Interaction):
+        server_id = str(interaction.guild.id)
+        await self.send_qotd(server_id, interaction)
+        await interaction.response.send_message("QOTD sent!", ephemeral=True)
 
-async def setup(bot: commands.Bot):
+async def setup(bot):
     await bot.add_cog(QOTD(bot))
+            
+
+
+    
+
 

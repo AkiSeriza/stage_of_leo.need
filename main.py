@@ -2,12 +2,9 @@ import discord
 from discord.ext import commands
 import os
 from dotenv import load_dotenv
-import logging
+from logger import log
 
 load_dotenv()
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
-logger = logging.getLogger(__name__)
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -32,14 +29,18 @@ async def load_extensions():
         try:
             await bot.load_extension(ext)
             print(f"Loaded: {ext}")
+            log("info", f"StartUp, Loaded extension: {ext}")
         except Exception as e:
             print(f"Failed to load {ext}: {e}")
+            log("error", f"StartUp, Failed to load {ext}: {e}")
 
 async def main():
     async with bot:
         await load_extensions()
         await bot.start(os.getenv("DISCORD_TOKEN"))
+        log("info", "Bot started successfully as {bot.user}")
 
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
