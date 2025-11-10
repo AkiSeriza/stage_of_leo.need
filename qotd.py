@@ -6,6 +6,7 @@ import json
 import datetime
 import random
 from logger import log
+from discord.ext import tasks
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 QOTD_FOLDER = os.path.join(BASE_DIR, "Databases", "QOTD")
@@ -28,13 +29,13 @@ class QOTD(commands.Cog):
             for j in expected_files:
                 if not os.path.exists(os.path.join(server_folders, j)):
                     with open(os.path.join(server_folders, j), "w") as f:
-                        json.dump({}, f)
+                        json.dump({}, f, indent=4)
     
     def load_global_server_info(self):
         servers = os.path.join(QOTD_FOLDER, "qotd_servers.json")
         if not os.path.exists(servers):
             with open(servers, "w") as f:
-                json.dump({}, f)
+                json.dump({}, f, indent=4)
         with open(servers, "r") as f:
             return json.load(f)
     
@@ -43,10 +44,14 @@ class QOTD(commands.Cog):
         log_file = os.path.join(QOTD_FOLDER, server_id, "log.json")
         today = datetime.datetime.today()
         formatted = today.strftime("%Y-%m-%d") 
+        channel_id = self.global_server_data[server_id]["channel_id"]
+        channel = interaction.guild.get_channel(channel_id)
         with open(suggestion_file,"r") as f:
             suggest_file_open = json.load(f)
         keys = list(suggest_file_open.keys())
         today_selected = random.choice(keys)
+        if not keys:
+            await channel.send("No more QOTD, use /qotdsuggest to suggest some!")
         with open(log_file, "r") as f:
             log_file_open = json.load(f)
         selected = {}
@@ -58,9 +63,9 @@ class QOTD(commands.Cog):
         log_file_open[index] = selected
         suggest_file_open.pop(today_selected)
         with open(suggestion_file,"w", encoding="utf-8") as f:
-            json.dump(suggest_file_open, f)
+            json.dump(suggest_file_open, f, indent=4)
         with open(log_file,"w", encoding="utf-8") as f:
-            json.dump(log_file_open, f)
+            json.dump(log_file_open, f, indent=4)
         embed = discord.Embed(
             color=0x4169E1, 
             description= f"**<:ichiheart:1384047120704602112> Question of the Day #{index} for {formatted}**")
@@ -68,10 +73,8 @@ class QOTD(commands.Cog):
         servers_file = os.path.join(QOTD_FOLDER, "qotd_servers.json")
         with open(servers_file, "w", encoding="utf-8") as f:
             json.dump(self.global_server_data, f, indent=4)
-        channel_id = self.global_server_data[server_id]["channel_id"]
-        channel = interaction.guild.get_channel(channel_id)
         role = self.global_server_data[server_id]["role"]
-        embed.add_field(name=selected["question"], value=" ", inline=False)
+        embed.add_field(name=selected["question"], value=".⋆ ˖ ࣪ ⊹ ° ┗━°✦✦⌜星乃一歌⌟✦✦°━┛° ⊹ ࣪ ˖ ⋆.", inline=False)
         member = interaction.guild.get_member(selected["suggestor"])
         if not member: 
             try:
@@ -82,12 +85,36 @@ class QOTD(commands.Cog):
         member_name = member.display_name if member else f"User ID {selected['suggestor']}"
         embed.set_footer(text=f"Suggested by {member_name} on {selected["time"]}")
         await channel.send(f"<@&{role}>")
-        await channel.send(embed=embed)
+        message = await channel.send(embed=embed)
+        thread = await message.create_thread(
+            name=f"Daily Question of the Day #{index}",
+            auto_archive_duration=1440,
+            reason="Daily QOTD discussion thread"
+        )
 
-
-    
-
-
+    @tasks.loop(minutes=1)
+    async def daily_send(self):
+        now = datetime.datetime.utcnow() 
+        for server_id, data in self.global_server_data.items():
+            if "time" not in data or "channel_id" not in data:
+                continue
+            target_time = data["time"]
+            target_hour = int(target_time[:2])
+            target_minute = int(target_time[2:])
+            pacific_now = datetime.datetime.utcnow() - datetime.timedelta(hours=7) 
+            if pacific_now.hour == target_hour and pacific_now.minute == target_minute:
+                try:
+                    guild = self.bot.get_guild(int(server_id))
+                    if guild:
+                        class DummyInteraction:
+                            def __init__(self, guild):
+                                self.guild = guild
+                                self.user = None
+                                self.response = None
+                        interaction = DummyInteraction(guild)
+                        await self.send_qotd(server_id, interaction)
+                except Exception as e:
+                    print(f"Failed to send QOTD for {server_id}: {e}")
 
     @app_commands.command(
             name="qotdsetup", description="Setup QOTD funtionality for the server"
@@ -136,8 +163,8 @@ class QOTD(commands.Cog):
             temp_server_suggestions = json.load(f)
         temp_server_suggestions[message_id] = suggestionF
         with open(server_file, "w",encoding="utf-8") as f:
-            json.dump(temp_server_suggestions, f)
-        await interaction.response.send_message("Suggestion Recieved!")
+            json.dump(temp_server_suggestions, f, indent=4)
+        await interaction.response.send_message("<:ichiheart:1384047120704602112> Thank you for the suggestion!",ephemeral=True)
     
     @app_commands.command(name="qotdforce", description="Force to send a QOTD")
     @app_commands.checks.has_permissions(administrator=True)
@@ -145,10 +172,6 @@ class QOTD(commands.Cog):
         server_id = str(interaction.guild.id)
         await self.send_qotd(server_id, interaction)
         await interaction.response.send_message("QOTD sent!", ephemeral=True)
-
-
-
-    
 
 async def setup(bot):
     await bot.add_cog(QOTD(bot))
