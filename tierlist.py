@@ -376,10 +376,10 @@ class TierListCog(commands.Cog):
 
         embed = discord.Embed(
             title=song_key,
-            description=song.get("Commission", ""),
+            description=f"[{song.get("eng")}]({song.get("yt","")})",
             color=0x4169E1
         )
-
+        embed.add_field(name="",value=song.get("Commission", ""), inline=False)
         if song.get("link"):
             embed.set_thumbnail(url=song.get("link"))
 
@@ -503,7 +503,6 @@ class TierListCog(commands.Cog):
             )
             return
 
-        # get the next song
         song_key = get_next_song_for_server(sid_str)
         if not song_key:
             await interaction.response.send_message("No songs available to post.", ephemeral=True)
@@ -514,10 +513,9 @@ class TierListCog(commands.Cog):
             await interaction.response.send_message("Configured channel not found.", ephemeral=True)
             return
 
-        # Post the embed with the role mention
+
         await self.send_song_embed(channel, song_key, int(sid_str), int(role_id))
 
-        # Mark that today's post has been sent
         pacific_tz = pytz.timezone('America/Los_Angeles')
         pacific_date = datetime.now(pacific_tz).strftime("%Y-%m-%d")
 

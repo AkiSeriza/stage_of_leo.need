@@ -18,6 +18,7 @@ class QOTD(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.check_server_folders()
+        self.daily_send.start()
 
     def check_server_folders(self):
         self.global_server_data = self.load_global_server_info()
@@ -49,9 +50,10 @@ class QOTD(commands.Cog):
         with open(suggestion_file,"r") as f:
             suggest_file_open = json.load(f)
         keys = list(suggest_file_open.keys())
-        today_selected = random.choice(keys)
         if not keys:
             await channel.send("No more QOTD, use /qotdsuggest to suggest some!")
+            return
+        today_selected = random.choice(keys)
         with open(log_file, "r") as f:
             log_file_open = json.load(f)
         selected = {}
