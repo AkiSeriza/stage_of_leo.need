@@ -73,7 +73,7 @@ class Fun(commands.Cog):
         )
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="ichianthology", description="Browse the Ichika Anthology")
+    @app_commands.command(name="ichianthologybrowse", description="Browse the Ichika Anthology")
     async def ichianthology(self, interaction: discord.Interaction):
         if not self.database:
             await interaction.response.send_message(
@@ -160,11 +160,6 @@ class AnthologyView(discord.ui.View):
     async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.index = (self.index + 1) % len(self.pages)
         await self.update_embed(interaction)
-
-
-
-
-
 
 async def setup(bot):
     await bot.add_cog(Fun(bot))

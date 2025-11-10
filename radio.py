@@ -8,10 +8,8 @@ from discord import app_commands
 from discord.ext import commands
 from songguess import song_guess
 
-
 SONGS_FOLDER = "Songs"
 QUEUE_LIMIT = 7
-
 
 queue = [] 
 played_songs = []  
@@ -27,7 +25,6 @@ async def unit_autocomplete(interaction: discord.Interaction, current: str):
     filtered = [u for u in units if current.lower() in u.lower()]
     return [app_commands.Choice(name=u, value=u) for u in filtered[:25]]
 
-
 async def song_autocomplete(interaction: discord.Interaction, current: str):
     unit = getattr(interaction.namespace, "unit", "LeoNeed") or "LeoNeed"
     unit_path = os.path.join(SONGS_FOLDER, unit, "music")
@@ -39,7 +36,6 @@ async def song_autocomplete(interaction: discord.Interaction, current: str):
     ]
     filtered = [s for s in songs if current.lower() in s.lower()]
     return [app_commands.Choice(name=s, value=s) for s in filtered[:25]]
-
 
 async def type_autocomplete(interaction: discord.Interaction, current: str):
     options = ["Normal", "Instrumental", "Vocals Only"]
@@ -59,8 +55,6 @@ async def type_autocomplete(interaction: discord.Interaction, current: str):
     filtered = [o for o in options if current.lower() in o.lower()]
     return [app_commands.Choice(name=o, value=o) for o in filtered[:25]]
 
-
-
 class Radio(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -73,7 +67,6 @@ class Radio(commands.Cog):
             if entry.lower() == unit.lower():
                 return entry
         return unit
-
     def get_song_path(self, unit: str, song_name: str, song_type: str = "music"):
         type_folder_map = {
             "norm": "music",
@@ -139,7 +132,7 @@ class Radio(commands.Cog):
 
         vc.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(vc), self.bot.loop))
 
-    @app_commands.command(name="radio", description="Start music radio loop")
+    @app_commands.command(name="radiostart", description="Start music radio loop")
     async def radio(self, interaction: discord.Interaction):
         global radio_active
         global song_guess
@@ -159,7 +152,7 @@ class Radio(commands.Cog):
         await interaction.response.send_message("<:ichiganba:1381502507225710716> Started radio loop.")
         radio_active = True
 
-    @app_commands.command(name="skip", description="Skip the current song")
+    @app_commands.command(name="radioskip", description="Skip the current song")
     async def skip(self, interaction: discord.Interaction):
         vc = interaction.guild.voice_client
         if vc and vc.is_playing():
@@ -168,7 +161,7 @@ class Radio(commands.Cog):
         else:
             await interaction.response.send_message("<:ichisip:1365858916361306192> No song currently playing.")
 
-    @app_commands.command(name="stop", description="Stop music and disconnect")
+    @app_commands.command(name="radiostop", description="Stop music and disconnect")
     async def stop(self, interaction: discord.Interaction):
         global radio_active
         vc = interaction.guild.voice_client
@@ -179,7 +172,7 @@ class Radio(commands.Cog):
         else:
             await interaction.response.send_message("<:ichisip:1365858916361306192> Not in a voice channel.")
 
-    @app_commands.command(name="history", description="Show the last 5 played songs")
+    @app_commands.command(name="radiohistory", description="Show the last 5 played songs")
     async def history(self, interaction: discord.Interaction):
         global played_songs
         await interaction.response.defer(thinking=False)
@@ -203,7 +196,7 @@ class Radio(commands.Cog):
         else:
             await interaction.followup.send(embed=embed)
 
-    @app_commands.command(name="loop", description="Toggle looping for current song")
+    @app_commands.command(name="radioloop", description="Toggle looping for current song")
     async def loop(self, interaction: discord.Interaction):
         global loop_enabled
         vc = interaction.guild.voice_client
@@ -214,7 +207,7 @@ class Radio(commands.Cog):
         loop_enabled = not loop_enabled
         await interaction.response.send_message("🔁 Loop enabled" if loop_enabled else "➡️ Loop disabled.")
 
-    @app_commands.command(name="request", description="Request a song to add to the queue")
+    @app_commands.command(name="radiorequest", description="Request a song to add to the queue")
     @app_commands.describe(
         unit="Song group or folder name",
         song="Song name",
@@ -275,8 +268,7 @@ class Radio(commands.Cog):
             f"🎵 Added **{song}** ({song_type}) to the queue. ({len(queue)}/{QUEUE_LIMIT})"
         )
 
-       
-    @app_commands.command(name="queue", description="Show all upcoming requested songs")
+    @app_commands.command(name="radioqueue", description="Show all upcoming requested songs")
     async def queue_cmd(self, interaction: discord.Interaction):
         global queue
         await interaction.response.defer(thinking=False)
@@ -310,7 +302,7 @@ class Radio(commands.Cog):
             )
             await interaction.followup.send(embed=embed)
 
-    @app_commands.command(name="clear", description="Clear the entire request queue")
+    @app_commands.command(name="radioclear", description="Clear the entire request queue")
     async def clear(self, interaction: discord.Interaction):
         global queue
         await interaction.response.defer(thinking=False)
