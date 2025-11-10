@@ -344,7 +344,6 @@ class TierListCog(commands.Cog):
                 except Exception as e:
                     print("Error sending scheduled song:", e)
 
-
     @tasks.loop(time=time(hour=0, minute=0, tzinfo=pytz.timezone('America/Los_Angeles')))
     async def midnight_task(self):
         print("Running midnight tier assignment")
@@ -411,7 +410,7 @@ class TierListCog(commands.Cog):
         }
         save_json(ACTIVE_VOTES_PATH, active_votes)
 
-    @app_commands.command(name="tierlist", description="Show the server's current tier list")
+    @app_commands.command(name="tierlistshow", description="Show the server's current tier list")
     async def slash_tierlist(self, interaction: discord.Interaction):
         setups = load_json(SERVER_SETUP_PATH)
         sid = str(interaction.guild.id)
@@ -458,7 +457,7 @@ class TierListCog(commands.Cog):
         save_json(SERVER_SETUP_PATH, setups)
         await interaction.response.send_message(f"Tierlist scheduled to post daily at {hh:02d}:{mm:02d} Pacific Time in {channel.mention}")
 
-    @app_commands.command(name="forceupdate", description="Force an immediate update of the server's tier list.")
+    @app_commands.command(name="tierlistforceupdate", description="Force an immediate update of the server's tier list.")
     @app_commands.checks.has_permissions(administrator=True)
     async def force_update(self, interaction: discord.Interaction):
         sid = interaction.guild_id
@@ -478,7 +477,7 @@ class TierListCog(commands.Cog):
         except Exception as e:
             await interaction.response.send_message(f"❌ Error updating tier list: {str(e)}", ephemeral=True)
 
-    @app_commands.command(name="forcedailypost", description="Force the next daily tierlist post to send immediately and advance the list.")
+    @app_commands.command(name="tierlistforce", description="Force the next daily tierlist post to send immediately and advance the list.")
     @app_commands.checks.has_permissions(administrator=True)
     async def force_daily_post(self, interaction: discord.Interaction):
         print(f"[DEBUG] Force daily post triggered")
