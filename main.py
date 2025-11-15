@@ -20,7 +20,7 @@ extensions = [
     "fun",
     "qotd",
     "starboard",
-    #"songguess"
+    "songguess",
     'tierlist'
 ]
 

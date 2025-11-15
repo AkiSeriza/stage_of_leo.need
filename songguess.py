@@ -59,7 +59,7 @@ class SongGuess(commands.Cog):
         self.current_song = {}
         self.song_cache = {}
 
-    @app_commands.command(name="songguessconfig", description="Configure the Song Guess game")
+    @app_commands.command(name="guessconfig", description="Configure the Song Guess game")
     @app_commands.describe(
         time="Time limit for guessing (seconds)",
         unit="Select the unit for the songs"
@@ -96,21 +96,24 @@ class SongGuess(commands.Cog):
         else:
             voice_client = await voice_channel.connect()
 
-        await interaction.followup.send("🎵 Song Guess game started! Get ready...")
+        # 👇 Get the text channel directly
+        text_channel = interaction.channel
+
+        await text_channel.send("🎵 Song Guess game started! Get ready...")
 
         self.active_games[guild_id] = True
         self.scores[guild_id] = {}
         song_guess = True
 
         while self.active_games.get(guild_id):
-            await self.play_round(interaction, voice_client)
+            await self.play_round(interaction, voice_client, text_channel)
 
         if voice_client.is_connected():
             await voice_client.disconnect()
 
-        song_guess = False 
+        song_guess = False
 
-    async def play_round(self, interaction, voice_client):
+    async def play_round(self, interaction, voice_client, text_channel):
         guild_id = interaction.guild_id
         config = self.config[guild_id]
         time_limit = config["time"]
@@ -118,7 +121,7 @@ class SongGuess(commands.Cog):
 
         music_path = os.path.join(SONGS_FOLDER, unit, "music")
         if not os.path.isdir(music_path):
-            await interaction.followup.send("No songs found matching config.")
+            await text_channel.send("No songs found matching config.")
             self.active_games[guild_id] = False
             return
 
@@ -129,14 +132,16 @@ class SongGuess(commands.Cog):
         ]
 
         if not all_songs:
-            await interaction.followup.send("No songs found matching config.")
+            await text_channel.send("No songs found matching config.")
             self.active_games[guild_id] = False
             return
 
+        # Pick random song
         file_path = random.choice(all_songs)
         song_name = os.path.splitext(os.path.basename(file_path))[0]
         self.current_song[guild_id] = (song_name, file_path)
 
+        # Prepare audio slice
         audio_info = MP3(file_path)
         length = audio_info.info.length
         start_time = random.uniform(0, max(0, length - time_limit))
@@ -151,14 +156,16 @@ class SongGuess(commands.Cog):
             voice_client.stop()
         voice_client.play(source)
 
+        # Create NEW embed for each new song
         embed = discord.Embed(
-            title="Guess the Song!",
+            title="🎵 Guess the Song!",
             description=f"Time Remaining: **{time_limit}** seconds",
             color=discord.Color.blurple()
         )
         embed.set_footer(text="Use /guess <song name> to answer!")
-        message = await interaction.followup.send(embed=embed)
+        message = await text_channel.send(embed=embed)
 
+        # Countdown updates (edits only this round’s message)
         for t in range(time_limit, 0, -1):
             if not self.active_games.get(guild_id):
                 return
@@ -168,6 +175,7 @@ class SongGuess(commands.Cog):
 
         voice_client.stop()
 
+        # Build scoreboard
         score_lines = []
         for uid, (correct, total) in self.scores.get(guild_id, {}).items():
             user = interaction.guild.get_member(uid)
@@ -178,12 +186,13 @@ class SongGuess(commands.Cog):
         scoreboard = "\n".join(score_lines) if score_lines else "No guesses yet!"
 
         reveal = discord.Embed(
-            title="Time's Up!",
+            title="⏰ Time's Up!",
             description=f"The song was **{song_name}**!\n\n**Standings:**\n{scoreboard}",
             color=discord.Color.green()
         )
-        await message.edit(embed=reveal)
-        await asyncio.sleep(3)
+        await text_channel.send(embed=reveal)
+        await asyncio.sleep(5)
+
 
     @app_commands.command(name="guess", description="Make a guess for the current song.")
     @app_commands.autocomplete(song=song_autocomplete)
@@ -207,7 +216,7 @@ class SongGuess(commands.Cog):
         else:
             await interaction.response.send_message("❌ Wrong guess!", ephemeral=True)
 
-    @app_commands.command(name="songguessend", description="End the Song Guess game.")
+    @app_commands.command(name="guessend", description="End the Song Guess game.")
     async def songguessend(self, interaction: discord.Interaction):
         global song_guess
         guild_id = interaction.guild_id
