@@ -276,7 +276,7 @@ class TierListCog(commands.Cog):
                 else:
                     timestamp = timestamp.astimezone(pacific_tz)
 
-                if (now - timestamp) > timedelta(days=1):
+                if (now - timestamp) > timedelta(days=3):
                     server_id = int(info.get("server_id", 0))
                     msg_id_int = int(msg_id)
                     channel = None
