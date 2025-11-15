@@ -123,8 +123,8 @@ class QOTD(commands.Cog):
         if role:
             role_obj = interaction.guild.get_role(role)
             view = QOTDRoleButton(role_obj)
-            #await channel.send(f"<@&{role}>")
-            await channel.send(f"Hi! It seems like the discord API tweaked out a few seconds ago and ended up firing 2 qotd's in quick succession. To avoid pinging one time too much, I have overriden the ping with this message instead. Have a great day!!")
+            await channel.send(f"<@&{role}>")
+            #await channel.send(f"Hi! It seems like the discord API tweaked out a few seconds ago and ended up firing 2 qotd's in quick succession. To avoid pinging one time too much, I have overriden the ping with this message instead. Have a great day!!")
             message = await channel.send(embed=embed, view=view)
         else:
             message = await channel.send(embed=embed)

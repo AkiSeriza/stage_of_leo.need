@@ -342,6 +342,7 @@ class TierListCog(commands.Cog):
                         song_key = get_next_song_for_server(str(sid))
                         if song_key:
                             await self.send_song_embed(channel, song_key, int(sid),role)
+                            setups = load_json(SERVER_SETUP_PATH)
                             setups[sid]["last_sent"] = pacific_date
                             save_json(SERVER_SETUP_PATH, setups)
                 except Exception as e:
