@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import discord
 from discord import app_commands
 from discord.ext import commands    
@@ -14,11 +15,44 @@ PHOTO_FOLDER = os.path.join(BASE_DIR, "Databases", "Photos")
 expected_files = ["suggestions.json", "log.json"]
 
 
+class QOTDRoleButton(discord.ui.View):
+    def __init__(self, role: discord.Role):
+        super().__init__(timeout=None)
+        self.role = role
+
+    @discord.ui.button(label="Toggle QOTD Role", style=discord.ButtonStyle.blurple)
+    async def toggle_role(self, interaction: discord.Interaction, button: discord.ui.Button):
+        member = interaction.user
+        role = self.role
+
+        if role in member.roles:
+            await member.remove_roles(role, reason="User opted out of QOTD pings.")
+            await interaction.response.send_message(f"Removed {role.mention}", ephemeral=True)
+        else:
+            await member.add_roles(role, reason="User opted in to QOTD pings.")
+            await interaction.response.send_message(f"Added {role.mention}", ephemeral=True)
+
+
 class QOTD(commands.Cog):
+
     def __init__(self, bot):
         self.bot = bot
         self.check_server_folders()
-        self.daily_send.start()
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if not self.daily_send.is_running():
+            self.daily_send.start()
+        for server_id, data in self.global_server_data.items():
+            role_id = data.get("role")
+            if role_id:
+                guild = self.bot.get_guild(int(server_id))
+                role = guild.get_role(role_id) if guild else None
+                if role:
+                    self.bot.add_view(QOTDRoleButton(role))
+
+        if not self.daily_send.is_running():
+            self.daily_send.start()
 
     def check_server_folders(self):
         self.global_server_data = self.load_global_server_info()
@@ -85,9 +119,16 @@ class QOTD(commands.Cog):
                 member = None
 
         member_name = member.display_name if member else f"User ID {selected['suggestor']}"
-        embed.set_footer(text=f"Suggested by {member_name} on {selected["time"]}")
-        await channel.send(f"<@&{role}>")
-        message = await channel.send(embed=embed)
+        embed.set_footer(text=f"Suggested by {member_name} on {selected['time']}")
+        if role:
+            role_obj = interaction.guild.get_role(role)
+            view = QOTDRoleButton(role_obj)
+            #await channel.send(f"<@&{role}>")
+            await channel.send(f"Hi! It seems like the discord API tweaked out a few seconds ago and ended up firing 2 qotd's in quick succession. To avoid pinging one time too much, I have overriden the ping with this message instead. Have a great day!!")
+            message = await channel.send(embed=embed, view=view)
+        else:
+            message = await channel.send(embed=embed)
+
         thread = await message.create_thread(
             name=f"Daily Question of the Day #{index}",
             auto_archive_duration=1440,
@@ -174,6 +215,8 @@ class QOTD(commands.Cog):
         server_id = str(interaction.guild.id)
         await self.send_qotd(server_id, interaction)
         await interaction.response.send_message("QOTD sent!", ephemeral=True)
+    
+    
 
 async def setup(bot):
     await bot.add_cog(QOTD(bot))

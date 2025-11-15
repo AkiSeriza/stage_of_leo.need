@@ -7,6 +7,9 @@ from pathlib import Path
 from datetime import datetime, time, timedelta
 from typing import Dict, List
 import pytz
+from tierlistgen import tierlistmake as tsm
+import PIL
+import os
 
 BASE_DIR = Path(__file__).parent
 DB_DIR = BASE_DIR / "Databases" / "Tierlist"
@@ -412,28 +415,36 @@ class TierListCog(commands.Cog):
 
     @app_commands.command(name="tierlistshow", description="Show the server's current tier list")
     async def slash_tierlist(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         setups = load_json(SERVER_SETUP_PATH)
         sid = str(interaction.guild.id)
+        songslist = DB_DIR / "songslist.json"
         server_dir = DB_DIR / sid
         tier_csv = server_dir / "tier.csv"
         if not tier_csv.exists():
-            await interaction.response.send_message("No tier list found for this server. Make sure setup is complete.", ephemeral=True)
+            await interaction.followup.send(
+                "No tier list found for this server. Make sure setup is complete.",
+                ephemeral=True
+            )
             return
 
-        out_lines = []
-        with open(tier_csv, newline='', encoding='utf-8') as f:
-            csv_reader = csv.reader(f)
-            next(csv_reader, None)
-            current_tier = None
-            for tier, name, avg, total, votes in csv_reader:
-                if tier != current_tier:
-                    out_lines.append(f"\n**{tier} Tier**")
-                    current_tier = tier
-                out_lines.append(f"- {name} ({float(avg):.2f} avg, {votes} votes)")
-
-        text = "\n".join(out_lines)
-        await interaction.response.send_message(text if text.strip() else "(empty tier list)", ephemeral=True)
-
+        img = tsm(tier_csv, songslist)
+        img.save(os.path.join(DB_DIR,sid,"tierlist.png"))
+        print("image generated")
+        file_path = os.path.join(DB_DIR,sid,"tierlist.png")
+        print("image being sent")
+        file = discord.File(file_path, filename="test.png")
+        print("image being sent 2")
+        embed = discord.Embed(
+            title=f"{interaction.guild.name} Tierlist",
+            description="Vote more!",
+            color=0x4169E1
+        )
+        print("image being sent 3")
+        embed.set_image(url="attachment://test.png")
+        print("image being sent 4")
+        await interaction.followup.send(embed=embed, file=file)
+        print("done")
 
     @app_commands.command(name="tierlistsetup", description="Configure the tierlist system for this server (Pacific Time)")
     @app_commands.checks.has_permissions(administrator=True)
