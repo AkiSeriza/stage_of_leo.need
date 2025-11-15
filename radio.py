@@ -22,6 +22,7 @@ async def unit_autocomplete(interaction: discord.Interaction, current: str):
         entry for entry in os.listdir(SONGS_FOLDER)
         if os.path.isdir(os.path.join(SONGS_FOLDER, entry))
     ]
+    units.remove("RadWimps")
     filtered = [u for u in units if current.lower() in u.lower()]
     return [app_commands.Choice(name=u, value=u) for u in filtered[:25]]
 
