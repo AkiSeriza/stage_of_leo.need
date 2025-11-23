@@ -2,172 +2,47 @@ import discord
 from discord.ext import commands, tasks
 from discord import app_commands
 import json
-import csv
-from pathlib import Path
-from datetime import datetime, time, timedelta
+from tierlistgen import tierlistmake as tlm
+import os
 from typing import Dict, List
 import pytz
-from tierlistgen import tierlistmake as tsm
-import PIL
-import os
-
-BASE_DIR = Path(__file__).parent
-DB_DIR = BASE_DIR / "Databases" / "Tierlist"
-SONG_LIST_PATH = DB_DIR / "songslist.json"
-SONG_SCORES_PATH = DB_DIR / "songscores.json"
-SERVER_SETUP_PATH = DB_DIR / "serversetups.json"
-VOTES_PATH = DB_DIR / "votes.json"
-ACTIVE_VOTES_PATH = DB_DIR / "activevotes.json"
+from datetime import datetime
 
 
-role_event = ""
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_DIR = os.path.join(BASE_DIR, "Databases", "Tierlist")
+SONG_LIST_PATH = os.path.join(DB_DIR, "songslist.json")
+SERVER_SETUP_PATH = os.path.join(DB_DIR, "serversetups.json")
+VOTES_PATH = os.path.join(DB_DIR, "votes.json")
+SONGSCORES_PATH = os.path.join(DB_DIR, "songscores.json")
+PHOTO_FOLDER = os.path.join(BASE_DIR, "Databases", "Photos")
+REVOTES_PATH = os.path.join(DB_DIR, "revotes.json")
 
-def ensure_vote_file():
-    if not VOTES_PATH.exists():
-        VOTES_PATH.write_text("{}")
+def load_revotes():
+    return load_json(REVOTES_PATH)
 
-def load_votes():
-    return load_json(VOTES_PATH)
+def save_revotes(data):
+    save_json(REVOTES_PATH, data)
 
-
-def save_votes(data):
-    save_json(VOTES_PATH, data)
-
-DEFAULT_THRESHOLDS = {
-    "S+": 7.0,
-    "S": 6.0,
-    "A": 5.0,
-    "B": 4.0,
-    "C": 3.0,
-    "D": 0.0,
+Standard_score = {
+    "Thresholds": {"S+": 7.0, "S": 6.0, "A": 5.0, "B": 4.0, "C": 3.0, "D": 0.0},
+    "ScoreMap": {"S+": 10, "S": 7, "A": 5, "B": 4, "C": 2, "D": 1}
 }
 
-DEFAULT_SCORES = {
-    "S+": 7,
-    "S": 6,
-    "A": 5,
-    "B": 4,
-    "C": 3,
-    "D": 1,
-}
-
-def ensure_dirs():
-    print("[DEBUG] Ensuring directories exist")
-    DB_DIR.mkdir(parents=True, exist_ok=True)
-    if not SONG_LIST_PATH.exists():
-        print(f"[DEBUG] Creating new empty song list at {SONG_LIST_PATH}")
-        SONG_LIST_PATH.write_text("{}")
-    else:
-        print(f"[DEBUG] Song list exists at {SONG_LIST_PATH}")
-    if not SONG_SCORES_PATH.exists():
-        SONG_SCORES_PATH.write_text("{}")
-    if not SERVER_SETUP_PATH.exists():
-        SERVER_SETUP_PATH.write_text("{}")
-    if not VOTES_PATH.exists():
-        VOTES_PATH.write_text("{}") 
-    if not ACTIVE_VOTES_PATH.exists():
-        ACTIVE_VOTES_PATH.write_text("{}")
-
-def load_json(path: Path):
-    print(f"[DEBUG] Loading JSON from {path}")
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            print(f"[DEBUG] Loaded data: {data}")
-            return data
-    except Exception as e:
-        print(f"[DEBUG] Error loading {path}: {str(e)}")
-        return {}
-
-def save_json(path: Path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
-
-_active_vote_state: Dict[int, Dict[int, str]] = {}
-_active_vote_message_song: Dict[int, str] = {}
-
-class TierVoteView(discord.ui.View):
-    def __init__(self, bot: commands.Bot, song_key: str, server_id: int, score_map: Dict[str,int]):
-        super().__init__(timeout=None)
-        self.bot = bot
-        self.song_key = song_key
-        self.server_id = str(server_id)
-        self.score_map = score_map
-
-        for label in ["S+", "S", "A", "B", "C", "D"]:
-            self.add_item(TierButton(label, self))
-
-class TierButton(discord.ui.Button):
-    def __init__(self, label: str, view: TierVoteView):
-        super().__init__(label=label, style=discord.ButtonStyle.primary)
-        self.tier_view = view
-
-    async def callback(self, interaction: discord.Interaction):
-        user_id = str(interaction.user.id)
-        msg_id = interaction.message.id
-        song_key = self.tier_view.song_key
-        server_id = str(self.tier_view.server_id)
-        choice = self.label
-
-        voters = _active_vote_state.setdefault(msg_id, {})
-        prev_choice = voters.get(user_id)
-
-        votes_data = load_votes()
-        votes_data.setdefault(song_key, {}).setdefault(server_id, {})
-
-        if prev_choice == choice:
-            del voters[user_id]
-            update_score_for_song(song_key, server_id, -self.tier_view.score_map[choice], -1)
-            votes_data[song_key][server_id].pop(user_id, None)
-            save_votes(votes_data)
-            await interaction.response.send_message(f"Removed your vote ({choice}) for {song_key}", ephemeral=True)
-            return
-
-        if prev_choice:
-            update_score_for_song(song_key, server_id, -self.tier_view.score_map[prev_choice], -1)
-
-        voters[user_id] = choice
-        update_score_for_song(song_key, server_id, self.tier_view.score_map[choice], 1)
-
-        votes_data[song_key][server_id][user_id] = choice
-        save_votes(votes_data)
-
-        await interaction.response.send_message(f"Registered your vote ({choice}) for {song_key}", ephemeral=True)
-
-
-
-def update_score_for_song(song_key: str, server_id: str, delta_score: int, delta_votes: int):
-    data = load_json(SONG_SCORES_PATH)
-    if song_key not in data:
-        data[song_key] = {}
-    server_scores = data[song_key].get(server_id, [0,0])
-    server_scores[0] = int(server_scores[0]) + int(delta_score)
-    server_scores[1] = int(server_scores[1]) + int(delta_votes)
-    if server_scores[1] < 0:
-        server_scores[1] = 0
-    if server_scores[0] < 0:
-        server_scores[0] = 0
-    data[song_key][server_id] = server_scores
-    save_json(SONG_SCORES_PATH, data)
-    write_server_scores_csv(server_id, data)
-
-def write_server_scores_csv(server_id: str, full_scores_data=None):
-    if full_scores_data is None:
-        full_scores_data = load_json(SONG_SCORES_PATH)
-    server_dir = DB_DIR / server_id
-    server_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = server_dir / "scores.csv"
-    csv_lines = ["name,total_score,votes,average"]
-    for song, servers in full_scores_data.items():
-        if server_id in servers:
-            total, votes = servers[server_id]
-            avg = (total / votes) if votes>0 else 0
-            csv_lines.append(f"{song},{total},{votes},{avg:.3f}")
-    csv_path.write_text("\n".join(csv_lines), encoding='utf-8')
+def write_tier_csv(server_id: str, tiers: Dict[str, List[Dict]]):
+    server_dir = os.path.join(DB_DIR, str(server_id))
+    os.makedirs(server_dir, exist_ok=True)
+    csv_path = os.path.join(server_dir, "tier.csv")
+    lines = ["Tier,Name,Average,Total,Votes"]
+    for tier in ["S+", "S", "A", "B", "C", "D"]:
+        for e in tiers.get(tier, []):
+            lines.append(f"{tier},{e['name']},{e['avg']:.3f},{e['total']},{e['votes']}")
+    with open(csv_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
 
 def assign_tiers_for_server(server_id: str, thresholds: Dict[str,float]=None):
-    thresholds = thresholds or DEFAULT_THRESHOLDS
-    full_scores = load_json(SONG_SCORES_PATH)
+    thresholds = thresholds or Standard_score["Thresholds"]
+    full_scores = load_json(SONGSCORES_PATH)
     song_list = []
     for song, servers in full_scores.items():
         if server_id in servers:
@@ -186,19 +61,16 @@ def assign_tiers_for_server(server_id: str, thresholds: Dict[str,float]=None):
         slice_items = song_list[idx:idx+k]
         idx += k
         return slice_items
-
     s_plus_slice = pop_slice(min(3, n))
     s_slice = pop_slice(min(5, max(0, n-idx)))
     a_slice = pop_slice(min(10, max(0, n-idx)))
     remaining = song_list[idx:]
-    rem_n = len(remaining)
     rem_n = len(remaining)
     b_count = int(rem_n * 0.5)
     b_slice = remaining[:b_count]
     c_count = int(rem_n * 0.4)
     c_slice = remaining[b_count:b_count+c_count]
     d_slice = remaining[b_count+c_count:]
-
     def add_if_meets(slice_items, tier_name):
         for song, avg, total, votes in slice_items:
             if avg >= thresholds.get(tier_name, 0):
@@ -215,332 +87,275 @@ def assign_tiers_for_server(server_id: str, thresholds: Dict[str,float]=None):
                         break
                 if not placed:
                     tiers["D"].append({"name":song, "avg":avg, "total":total, "votes":votes})
-
     add_if_meets(s_plus_slice, "S+")
     add_if_meets(s_slice, "S")
     add_if_meets(a_slice, "A")
     add_if_meets(b_slice, "B")
     add_if_meets(c_slice, "C")
     add_if_meets(d_slice, "D")
-
     write_tier_csv(server_id, tiers)
     return tiers
 
-def write_tier_csv(server_id: str, tiers: Dict[str,List[Dict]]):
-    server_dir = DB_DIR / server_id
-    server_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = server_dir / "tier.csv"
-    csv_lines = ["Tier,Name,Average,Total,Votes"]
-    for tier in ["S+","S","A","B","C","D"]:
-        entries = tiers.get(tier, [])
-        for e in entries:
-            csv_lines.append(f"{tier},{e['name']},{e['avg']:.3f},{e['total']},{e['votes']}")
-    csv_path.write_text("\n".join(csv_lines), encoding='utf-8')
+def load_json(path):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
 
-def get_next_song_for_server(server_id: str):
-    print(f"[DEBUG] Getting next song for server {server_id}")
-    setups = load_json(SERVER_SETUP_PATH)
-    print(f"[DEBUG] Loaded server setups: {setups}")
-    setups.setdefault(server_id, {})
-    cfg = setups[server_id]
-    idx = cfg.get("index", 0)
-    print(f"[DEBUG] Current index: {idx}")
-    songs = list(load_json(SONG_LIST_PATH).keys())
-    print(f"[DEBUG] Available songs: {songs}")
-    if not songs:
-        print("[DEBUG] No songs found in song list!")
-        return None
-    song_key = songs[idx % len(songs)]
-    print(f"[DEBUG] Selected song: {song_key}")
-    cfg["index"] = (idx + 1) % len(songs)
-    setups[server_id] = cfg
-    save_json(SERVER_SETUP_PATH, setups)
-    return song_key
+def save_json(path, data):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+        
+def tierlistembed(selected_song):
+    song_dict = load_json(SONG_LIST_PATH)
+    song = song_dict[selected_song]
+    embed = discord.Embed(
+        title=selected_song,
+        description=f"[{song.get('eng', 'No English title')}]({song.get('yt', '')})",
+        color=0x4169E1
+    )
+    embed.add_field(name="**Commission**", value=song.get("Commission", "-"), inline=False)
+    embed.add_field(name="**Arranger**", value=song.get("Arranger", "-"), inline=True)
+    embed.add_field(name="**Composer**", value=song.get("Composer", "-"), inline=True)
+    embed.add_field(name="**Lyricist**", value=song.get("Lyricist", "-"), inline=True)
+    embed.add_field(name="**JP Release**", value=song.get("JP Release", "-"), inline=True)
+    if song.get("link"):
+        embed.set_thumbnail(url=song["link"])
+    return embed
 
-class TierListCog(commands.Cog):
-    @tasks.loop(minutes=10.0)
-    async def check_expired_votes(self):
-        pacific_tz = pytz.timezone('America/Los_Angeles')
-        active_votes = load_json(ACTIVE_VOTES_PATH)
-        now = datetime.now(pacific_tz)
-        to_remove = []
-        for msg_id, info in list(active_votes.items()):
-            try:
-                ts = info.get("timestamp")
-                if not ts:
-                    to_remove.append(msg_id)
-                    continue
-                timestamp = datetime.fromisoformat(ts)
-                if timestamp.tzinfo is None:
-                    timestamp = pacific_tz.localize(timestamp)
-                else:
-                    timestamp = timestamp.astimezone(pacific_tz)
 
-                if (now - timestamp) > timedelta(days=3):
-                    server_id = int(info.get("server_id", 0))
-                    msg_id_int = int(msg_id)
-                    channel = None
-                    setups = load_json(SERVER_SETUP_PATH)
-                    if str(server_id) in setups:
-                        channel_id = setups[str(server_id)].get("Channel")
-                        if channel_id:
-                            channel = self.bot.get_channel(int(channel_id))
+class RevoteSelect(discord.ui.Select):
+    def __init__(self, all_songs, server_id, score_map):
+        song_list = load_json(SONG_LIST_PATH)
+        votes_data = load_json(VOTES_PATH)
+        server_id_str = str(server_id)
 
-                    if channel:
-                        try:
-                            msg = await channel.fetch_message(msg_id_int)
-                            await msg.delete()
-                        except discord.NotFound:
-                            pass
-
-                    to_remove.append(msg_id)
-            except Exception as e:
-                print("Error checking expired vote:", e)
-                to_remove.append(msg_id)
-
-        for msg_id in to_remove:
-            active_votes.pop(msg_id, None)
-        if to_remove:
-            save_json(ACTIVE_VOTES_PATH, active_votes)
-
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        ensure_dirs()
-        self.check_schedule.start()
-        self.midnight_task.start()
-        try:
-            self.check_expired_votes.start()
-        except RuntimeError:
-            pass
-
-    def cog_unload(self):
-        self.check_schedule.cancel()
-        self.midnight_task.cancel()
-        try:
-            self.check_expired_votes.cancel()
-        except Exception:
-            pass
-
-    @tasks.loop(seconds=60.0)
-    async def check_schedule(self):
-        pacific_tz = pytz.timezone('America/Los_Angeles')
-        now_pacific = datetime.now(pacific_tz)
-        hhmm = now_pacific.strftime("%H:%M")
-        pacific_date = now_pacific.strftime("%Y-%m-%d")
-        setups = load_json(SERVER_SETUP_PATH)
-        for sid, cfg in setups.items():
-            channel_id = cfg.get("Channel")
-            send_time = cfg.get("Time")
-            last_sent = cfg.get("last_sent")
-            role = cfg.get("Role")
-            if not channel_id or not send_time:
-                continue
-            if send_time == hhmm and last_sent != pacific_date:
-                try:
-                    channel = self.bot.get_channel(int(channel_id))
-                    if channel:
-                        song_key = get_next_song_for_server(str(sid))
-                        if song_key:
-                            await self.send_song_embed(channel, song_key, int(sid),role)
-                            setups = load_json(SERVER_SETUP_PATH)
-                            setups[sid]["last_sent"] = pacific_date
-                            save_json(SERVER_SETUP_PATH, setups)
-                except Exception as e:
-                    print("Error sending scheduled song:", e)
-
-    @tasks.loop(time=time(hour=0, minute=0, tzinfo=pytz.timezone('America/Los_Angeles')))
-    async def midnight_task(self):
-        print("Running midnight tier assignment")
-        setups = load_json(SERVER_SETUP_PATH)
-        for sid, cfg in setups.items():
-            thresholds = cfg.get("Thresholds", DEFAULT_THRESHOLDS)
-            assign_tiers_for_server(str(sid), thresholds)
-
-    @midnight_task.before_loop
-    async def before_midnight(self):
-        await self.bot.wait_until_ready()
-
-    @check_schedule.before_loop
-    async def before_check(self):
-        await self.bot.wait_until_ready()
-
-    @check_expired_votes.before_loop
-    async def before_check_expired(self):
-        await self.bot.wait_until_ready()
-
-    async def send_song_embed(self, channel: discord.abc.Messageable, song_key: str, server_id: int, mention_role: int):
-        songs = load_json(SONG_LIST_PATH)
-        song = songs.get(song_key, {})
-        if mention_role:
-            await channel.send(
-                f"<@&{mention_role}> Daily Tierlist is here!",
-                allowed_mentions=discord.AllowedMentions(roles=True)
-            )
-
-        embed = discord.Embed(
-            title=song_key,
-            description=f"[{song.get("eng")}]({song.get("yt","")})",
-            color=0x4169E1
-        )
-        embed.add_field(name="",value=song.get("Commission", ""), inline=False)
-        if song.get("link"):
-            embed.set_thumbnail(url=song.get("link"))
-
-        fields = [
-            ("**Arranger**", song.get("Arranger", "-")),
-            ("**Composer**", song.get("Composer", "-")),
-            ("**Lyricist**", song.get("Lyricist", "-")),
-            ("**JP Release**", song.get("JP Release", "-")),
+        # Only keep songs that have votes in this server
+        filtered_songs = [
+            song for song in all_songs
+            if votes_data.get(song, {}).get(server_id_str)
         ]
-        for name, val in fields:
-            embed.add_field(name=name, value=val, inline=True)
 
-        setups = load_json(SERVER_SETUP_PATH)
-        cfg = setups.get(str(server_id), {})
-        score_map = cfg.get("ScoreMap", DEFAULT_SCORES)
-        view = TierVoteView(self.bot, song_key, server_id, score_map)
+        options = []
+        for song in filtered_songs:
+            desc = song_list.get(song, {}).get("Commission", "-")
+            if len(desc) > 96:
+                desc = desc[:96] + "..."
+            options.append(discord.SelectOption(label=song, description=desc))
 
-        msg = await channel.send(embed=embed, view=view)
+        super().__init__(placeholder="Select a song to revote...", min_values=1, max_values=1, options=options)
+        self.server_id = server_id
+        self.score_map = score_map
 
-        _active_vote_state[msg.id] = {}
-        _active_vote_message_song[msg.id] = song_key
-
-        active_votes = load_json(ACTIVE_VOTES_PATH)
-        pacific_tz = pytz.timezone('America/Los_Angeles')
-        active_votes[str(msg.id)] = {
-            "server_id": str(server_id),
-            "song_key": song_key,
-            "timestamp": datetime.now(pacific_tz).isoformat()
-        }
-        save_json(ACTIVE_VOTES_PATH, active_votes)
-
-    @app_commands.command(name="tierlistshow", description="Show the server's current tier list")
-    async def slash_tierlist(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        setups = load_json(SERVER_SETUP_PATH)
-        sid = str(interaction.guild.id)
-        songslist = DB_DIR / "songslist.json"
-        server_dir = DB_DIR / sid
-        tier_csv = server_dir / "tier.csv"
-        if not tier_csv.exists():
-            await interaction.followup.send(
-                "No tier list found for this server. Make sure setup is complete.",
-                ephemeral=True
-            )
-            return
-
-        img = tsm(tier_csv, songslist)
-        img.save(os.path.join(DB_DIR,sid,"tierlist.png"))
-        print("image generated")
-        file_path = os.path.join(DB_DIR,sid,"tierlist.png")
-        print("image being sent")
-        file = discord.File(file_path, filename="test.png")
-        print("image being sent 2")
-        embed = discord.Embed(
-            title=f"{interaction.guild.name} Tierlist",
-            description="Vote more!",
-            color=0x4169E1
+    async def callback(self, interaction: discord.Interaction):
+        selected_song = self.values[0]
+        self.view.clear_items()
+        await interaction.response.edit_message(
+            content=f"You selected **{selected_song}**. Cast your vote below:",
+            embed=tierlistembed(selected_song),
+            view=TierVoteView(selected_song, self.server_id, self.score_map)
         )
-        print("image being sent 3")
-        embed.set_image(url="attachment://test.png")
-        print("image being sent 4")
-        await interaction.followup.send(embed=embed, file=file)
-        print("done")
 
-    @app_commands.command(name="tierlistsetup", description="Configure the tierlist system for this server (Pacific Time)")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def slash_setup(self, interaction: discord.Interaction, channel: discord.TextChannel, role: discord.Role, time_pacific: str):
-        try:
-            hh, mm = time_pacific.split(":")
-            hh = int(hh); mm = int(mm)
-            assert 0 <= hh < 24 and 0 <= mm < 60
-        except Exception:
-            await interaction.response.send_message("Time must be in HH:MM 24-hour Pacific time format.", ephemeral=True)
-            return
-        setups = load_json(SERVER_SETUP_PATH)
-        sid = str(interaction.guild.id)
-        setups.setdefault(sid, {})
-        setups[sid]["Channel"] = str(channel.id)
-        setups[sid]["Role"] = str(role.id)
-        setups[sid]["Time"] = f"{hh:02d}:{mm:02d}"
-        setups[sid].setdefault("index", 0)
-        setups[sid].setdefault("Thresholds", DEFAULT_THRESHOLDS)
-        setups[sid].setdefault("ScoreMap", DEFAULT_SCORES)
-        save_json(SERVER_SETUP_PATH, setups)
-        await interaction.response.send_message(f"Tierlist scheduled to post daily at {hh:02d}:{mm:02d} Pacific Time in {channel.mention}")
+class RevoteView(discord.ui.View):
+    def __init__(self, all_songs, server_id, score_map):
+        super().__init__(timeout=120)
+        self.add_item(RevoteSelect(all_songs, server_id, score_map))
 
-    @app_commands.command(name="tierlistforceupdate", description="Force an immediate update of the server's tier list.")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def force_update(self, interaction: discord.Interaction):
-        sid = interaction.guild_id
-        if not sid:
-            await interaction.response.send_message("This command must be used in a server.", ephemeral=True)
-            return
-        sid_str = str(sid)
-        setups = load_json(SERVER_SETUP_PATH)
-        cfg = setups.get(sid_str, {})
-        if not cfg:
-            await interaction.response.send_message("This server is not configured. Use /tierlist_setup first.", ephemeral=True)
-            return
-        try:
-            thresholds = cfg.get("Thresholds", DEFAULT_THRESHOLDS)
-            assign_tiers_for_server(sid_str, thresholds)
-            await interaction.response.send_message("✅ Tier list has been updated. Use /tierlist to see the changes.", ephemeral=True)
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Error updating tier list: {str(e)}", ephemeral=True)
+class TierButton(discord.ui.Button):
+    def __init__(self, song, server_id, tier, score_map):
+        super().__init__(label=tier, style=discord.ButtonStyle.primary)
+        self.song = song
+        self.server_id = str(server_id)
+        self.tier = tier
+        self.score_map = score_map
 
-    @app_commands.command(name="tierlistforce", description="Force the next daily tierlist post to send immediately and advance the list.")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def force_daily_post(self, interaction: discord.Interaction):
-        print(f"[DEBUG] Force daily post triggered")
-        sid = interaction.guild_id
-        print(f"[DEBUG] Server ID: {sid}")
-        if not sid:
-            await interaction.response.send_message("This command must be used in a server.", ephemeral=True)
-            return
+    async def callback(self, interaction: discord.Interaction):
+        user_id = str(interaction.user.id)
+        votes = load_json(VOTES_PATH)
+        votes.setdefault(self.song, {}).setdefault(self.server_id, {})
+        prev_vote = votes[self.song][self.server_id].get(user_id)
+        votes[self.song][self.server_id][user_id] = self.tier
+        save_json(VOTES_PATH, votes)
 
-        sid_str = str(sid)
-        print(f"[DEBUG] Loading server setup for ID {sid_str}")
-        setups = load_json(SERVER_SETUP_PATH)
-        print(f"[DEBUG] Server setups loaded: {setups}")
-        cfg = setups.get(sid_str, {})
-
-        channel_id = cfg.get("Channel")
-        role_id = cfg.get("Role")
-        if not channel_id or not role_id:
-            await interaction.response.send_message(
-                "No channel or role configured for this server. Use `/tierlistsetup` first.",
-                ephemeral=True
-            )
-            return
-
-        song_key = get_next_song_for_server(sid_str)
-        if not song_key:
-            await interaction.response.send_message("No songs available to post.", ephemeral=True)
-            return
-
-        channel = self.bot.get_channel(int(channel_id))
-        if not channel:
-            await interaction.response.send_message("Configured channel not found.", ephemeral=True)
-            return
-
-
-        await self.send_song_embed(channel, song_key, int(sid_str), int(role_id))
-
-        pacific_tz = pytz.timezone('America/Los_Angeles')
-        pacific_date = datetime.now(pacific_tz).strftime("%Y-%m-%d")
-
-        setups.setdefault(sid_str, {})
-        setups[sid_str]["last_sent"] = pacific_date
-        setups[sid_str]["index"] = setups[sid_str].get("index", 0) + 1
-        save_json(SERVER_SETUP_PATH, setups)
+        songscores = load_json(SONGSCORES_PATH)
+        songscores.setdefault(self.song, {}).setdefault(self.server_id, [0, 0])
+        if prev_vote:
+            songscores[self.song][self.server_id][0] -= self.score_map.get(prev_vote, 0)
+            songscores[self.song][self.server_id][1] -= 1
+        songscores[self.song][self.server_id][0] += self.score_map[self.tier]
+        songscores[self.song][self.server_id][1] += 1
+        save_json(SONGSCORES_PATH, songscores)
 
         await interaction.response.send_message(
-            f"✅ Forced daily post executed and advanced to the next song ({song_key}).",
+            f"Your vote ({self.tier}) for **{self.song}** has been recorded.",
+            ephemeral=True
+        )
+
+class TierVoteView(discord.ui.View):
+    def __init__(self, song, server_id, score_map):
+        super().__init__(timeout=None)
+        for tier in score_map:
+            self.add_item(TierButton(song, server_id, tier, score_map))
+
+def get_next_song(server_id):
+    server_id = str(server_id)
+    data = load_json(SERVER_SETUP_PATH)
+    current_index = data[server_id]["index"]
+    songs = list(load_json(SONG_LIST_PATH).keys())
+    data[server_id]["index"] += 1
+    save_json(SERVER_SETUP_PATH, data)
+    return songs[current_index % len(songs)]
+
+class TierList(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+        self.daily_tierlist_task.start()
+
+    @app_commands.command(name="tierlistsetup", description="Configure the tierlist system for this server")
+    @app_commands.describe(
+        channel = "Channel where the Daily Tierlist is sent",
+        time = "Time in US Pacific time to send the Tierlist (24H format eg. 1800)",
+        role = "Role to ping when Tierlist comes (Optional)"
+        )
+    @app_commands.checks.has_permissions(administrator=True)
+    async def tierlistsetup(self, interaction: discord.Interaction, channel: discord.TextChannel, role: discord.Role, time: str):
+        """
+        time_pacific: string in HH:MM 24-hour Pacific time
+        """
+        try:
+            hh, mm = map(int, time.split(":"))
+            if not (0 <= hh < 24 and 0 <= mm < 60):
+                raise ValueError
+        except Exception:
+            await interaction.response.send_message(
+                "Time must be in HH:MM 24-hour Pacific time format.", ephemeral=True
+            )
+            return
+
+        server_id = str(interaction.guild_id)
+        setups = load_json(SERVER_SETUP_PATH)
+        setups.setdefault(server_id, {})
+        setups[server_id]["Channel"] = str(channel.id)
+        setups[server_id]["Role"] = str(role.id)
+        setups[server_id].setdefault("ScoreMap", Standard_score["ScoreMap"])
+        setups[server_id].setdefault("Thresholds", Standard_score["Thresholds"])
+        setups[server_id].setdefault("index", 0)
+        setups[server_id]["Time"] = f"{hh:02d}:{mm:02d}"  # Store daily post time
+        save_json(SERVER_SETUP_PATH, setups)
+        file = discord.File(os.path.join(PHOTO_FOLDER,"Ichika_think.jpg"), filename="Ichika_think.jpg")
+        embed = discord.Embed(
+            color=0x4169E1,
+            description= "Setup Complete!"
+        )
+        embed.set_thumbnail(url="attachment://Ichika_think.jpg")
+        embed.add_field(name="Channel", value=channel, inline=True)
+        embed.add_field(name="Role", value=role if role else "None", inline=True)
+        embed.add_field(name="Time", value=time, inline=True)
+        await interaction.response.send_message(embed=embed, file = file , ephemeral=True)
+
+    @app_commands.command(name="tierlistshow", description="Show the server's current tier list")
+    async def tierlistshow(self, interaction: discord.Interaction):
+        server_id = str(interaction.guild_id)
+        await interaction.response.defer(thinking=True)
+        server_setups = load_json(SERVER_SETUP_PATH).get(server_id, {})
+        thresholds = server_setups.get("Thresholds", Standard_score["Thresholds"])
+        assign_tiers_for_server(server_id, thresholds)  # This updates CSV
+        server_dir = os.path.join(DB_DIR, server_id)
+        tier_csv = os.path.join(server_dir, "tier.csv")
+        if not os.path.exists(tier_csv):
+            await interaction.response.send_message(
+                "No tierlist CSV found. Wait for some votes or force a post.",
+                ephemeral=True
+            )
+            return
+        img = tlm(tier_csv, SONG_LIST_PATH)
+        img_path = os.path.join(server_dir, "tierlist.png")
+        img.save(img_path)
+        await interaction.followup.send(file=discord.File(img_path))
+
+    @app_commands.command(name="admintierlistforce", description="Send today's tierlist song manually")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def tierlistforce(self, interaction: discord.Interaction):
+        server_id = str(interaction.guild_id)
+        next_song = get_next_song(server_id)
+        server_data = load_json(SERVER_SETUP_PATH)[server_id]
+        channel = self.bot.get_channel(int(server_data["Channel"]))
+
+        await channel.send(f"<@&{server_data['Role']}>")
+        view = TierVoteView(next_song, server_id, server_data["ScoreMap"])
+        message = await channel.send(embed=tierlistembed(next_song), view=view)
+        thread = await message.create_thread(
+            name=f"Tierlist Discussion: {next_song}",
+            auto_archive_duration=1440,
+            reason="Tierlist Discussion"
+        )
+        await interaction.response.send_message(f"Forced tierlist to advance to {next_song}", ephemeral=True)
+
+    @app_commands.command(name="tierlistrevote", description="Vote on any song")
+    async def tierlistrevote(self, interaction: discord.Interaction):
+        server_id = str(interaction.guild_id)
+        server_data = load_json(SERVER_SETUP_PATH).get(server_id, {})
+        score_map = server_data.get("ScoreMap", Standard_score["ScoreMap"])
+
+        # Only include songs that actually have votes in this server
+        votes_data = load_json(VOTES_PATH)
+        all_songs_with_votes = [
+            song for song, servers in votes_data.items()
+            if server_id in servers and bool(servers[server_id])  # server has at least 1 vote
+        ]
+
+        if not all_songs_with_votes:
+            await interaction.response.send_message(
+                "No songs have votes yet in this server, so revoting is not possible.",
+                ephemeral=True
+            )
+            return
+
+        view = RevoteView(all_songs_with_votes, server_id, score_map)
+        await interaction.response.send_message(
+            "Select a song to revote and see its info:",
+            view=view,
             ephemeral=True
         )
 
 
-async def setup(bot: commands.Bot):
-    await bot.add_cog(TierListCog(bot))
+    @tasks.loop(seconds=5)
+    async def daily_tierlist_task(self):
+        setups = load_json(SERVER_SETUP_PATH)
+        pacific_tz = pytz.timezone("US/Pacific")
+        now = datetime.now(pacific_tz)
+        current_time_str = now.strftime("%H:%M")
 
+        for server_id, server_data in setups.items():
+            scheduled_time = server_data.get("Time")
+            if not scheduled_time:
+                continue 
+            if current_time_str != scheduled_time:
+                continue
+
+            channel_id = int(server_data.get("Channel"))
+            role_id = int(server_data.get("Role", 0))
+            channel = self.bot.get_channel(channel_id)
+            if not channel:
+                continue 
+
+            next_song = get_next_song(server_id)
+            view = TierVoteView(next_song, server_id, server_data["ScoreMap"])
+
+            ping_text = f"<@&{role_id}>" if role_id else ""
+            await channel.send(ping_text)
+            message = await channel.send(embed=tierlistembed(next_song), view=view)
+            thread = await message.create_thread(
+                name=f"Tierlist Discussion: {next_song}",
+                auto_archive_duration=1440,
+                reason="Tierlist Discussion"
+            )
+
+    @daily_tierlist_task.before_loop
+    async def before_daily_tierlist(self):
+        await self.bot.wait_until_ready()
+
+
+async def setup(bot):
+    await bot.add_cog(TierList(bot))
