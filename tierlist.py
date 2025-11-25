@@ -270,6 +270,7 @@ class TierList(commands.Cog):
                 ephemeral=True
             )
             return
+        print("hi")
         img = tlm(tier_csv, SONG_LIST_PATH)
         img_path = os.path.join(server_dir, "tierlist.png")
         img.save(img_path)
