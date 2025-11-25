@@ -272,7 +272,10 @@ class TierList(commands.Cog):
             return
         print("hi")
         img = tlm(tier_csv, SONG_LIST_PATH)
-        embed = discord.Embed(
+        img_path = os.path.join(server_dir, "tierlist.png")
+        img.save(img_path)
+        await interaction.followup.send(file=discord.File(img_path))
+        """embed = discord.Embed(
             color=0x4169E1,
             title=f"{interaction.guild}'s Tierlist"
         )
@@ -280,9 +283,9 @@ class TierList(commands.Cog):
         img_path = os.path.join(server_dir, "tierlist.png")
         img.save(img_path)
         file = File(img_path, filename="tierlist.png")
-        embed.set_image(url="attachment://tierlist.png")  # special syntax for attachments
+        embed.set_image(url="attachment://tierlist.png") 
         embed.set_footer(text="Use /tierlistrevote to vote on a previously voted song!", icon_url="https://i.namu.wiki/i/J4ZwMcNsF1aC5H9jpfYiKZqOhjI2ucqXytSd5zAfx-Qy6GTLXdwvW86KW_lDthZChvdwMoU4cXK9hpJhKEzYsA.webp")
-        await interaction.response.send_message(embed=embed, file=file)
+        await interaction.response.send_message(embed=embed, file=file)"""
 
     @app_commands.command(name="admintierlistforce", description="Send today's tierlist song manually")
     @app_commands.checks.has_permissions(administrator=True)
