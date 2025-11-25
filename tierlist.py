@@ -120,6 +120,7 @@ def tierlistembed(selected_song):
     embed.add_field(name="**Composer**", value=song.get("Composer", "-"), inline=True)
     embed.add_field(name="**Lyricist**", value=song.get("Lyricist", "-"), inline=True)
     embed.add_field(name="**JP Release**", value=song.get("JP Release", "-"), inline=True)
+    embed.set_footer(text="Use /tierlistrevote to vote on a previously voted song!", icon_url="https://i.namu.wiki/i/J4ZwMcNsF1aC5H9jpfYiKZqOhjI2ucqXytSd5zAfx-Qy6GTLXdwvW86KW_lDthZChvdwMoU4cXK9hpJhKEzYsA.webp")
     if song.get("link"):
         embed.set_thumbnail(url=song["link"])
     return embed
