@@ -7,7 +7,7 @@ import os
 from typing import Dict, List
 import pytz
 from datetime import datetime
-
+from discord import File
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_DIR = os.path.join(BASE_DIR, "Databases", "Tierlist")
@@ -242,7 +242,7 @@ class TierList(commands.Cog):
         setups[server_id].setdefault("ScoreMap", Standard_score["ScoreMap"])
         setups[server_id].setdefault("Thresholds", Standard_score["Thresholds"])
         setups[server_id].setdefault("index", 0)
-        setups[server_id]["Time"] = f"{hh:02d}:{mm:02d}"  # Store daily post time
+        setups[server_id]["Time"] = f"{hh:02d}:{mm:02d}"  
         save_json(SERVER_SETUP_PATH, setups)
         file = discord.File(os.path.join(PHOTO_FOLDER,"Ichika_think.jpg"), filename="Ichika_think.jpg")
         embed = discord.Embed(
@@ -261,7 +261,7 @@ class TierList(commands.Cog):
         await interaction.response.defer(thinking=True)
         server_setups = load_json(SERVER_SETUP_PATH).get(server_id, {})
         thresholds = server_setups.get("Thresholds", Standard_score["Thresholds"])
-        assign_tiers_for_server(server_id, thresholds)  # This updates CSV
+        assign_tiers_for_server(server_id, thresholds)
         server_dir = os.path.join(DB_DIR, server_id)
         tier_csv = os.path.join(server_dir, "tier.csv")
         if not os.path.exists(tier_csv):
@@ -272,9 +272,17 @@ class TierList(commands.Cog):
             return
         print("hi")
         img = tlm(tier_csv, SONG_LIST_PATH)
+        embed = discord.Embed(
+            color=0x4169E1,
+            title=f"{interaction.guild}'s Tierlist"
+        )
+
         img_path = os.path.join(server_dir, "tierlist.png")
         img.save(img_path)
-        await interaction.followup.send(file=discord.File(img_path))
+        file = File(img_path, filename="tierlist.png")
+        embed.set_image(url="attachment://tierlist.png")  # special syntax for attachments
+        embed.set_footer(text="Use /tierlistrevote to vote on a previously voted song!", icon_url="https://i.namu.wiki/i/J4ZwMcNsF1aC5H9jpfYiKZqOhjI2ucqXytSd5zAfx-Qy6GTLXdwvW86KW_lDthZChvdwMoU4cXK9hpJhKEzYsA.webp")
+        await interaction.response.send_message(embed=embed, file=file)
 
     @app_commands.command(name="admintierlistforce", description="Send today's tierlist song manually")
     @app_commands.checks.has_permissions(administrator=True)
@@ -299,12 +307,10 @@ class TierList(commands.Cog):
         server_id = str(interaction.guild_id)
         server_data = load_json(SERVER_SETUP_PATH).get(server_id, {})
         score_map = server_data.get("ScoreMap", Standard_score["ScoreMap"])
-
-        # Only include songs that actually have votes in this server
         votes_data = load_json(VOTES_PATH)
         all_songs_with_votes = [
             song for song, servers in votes_data.items()
-            if server_id in servers and bool(servers[server_id])  # server has at least 1 vote
+            if server_id in servers and bool(servers[server_id])  
         ]
 
         if not all_songs_with_votes:
