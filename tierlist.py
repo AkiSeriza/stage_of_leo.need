@@ -115,7 +115,7 @@ def tierlistembed(selected_song):
         description=f"[{song.get('eng', 'No English title')}]({song.get('yt', '')})",
         color=0x4169E1
     )
-    embed.add_field(name="**Commission**", value=song.get("Commission", "-"), inline=False)
+    embed.add_field(name="", value=song.get("Commission", "-"), inline=False)
     embed.add_field(name="**Arranger**", value=song.get("Arranger", "-"), inline=True)
     embed.add_field(name="**Composer**", value=song.get("Composer", "-"), inline=True)
     embed.add_field(name="**Lyricist**", value=song.get("Lyricist", "-"), inline=True)

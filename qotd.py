@@ -137,7 +137,6 @@ class QOTD(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def daily_send(self):
-        now = datetime.datetime.utcnow() 
         for server_id, data in self.global_server_data.items():
             if "time" not in data or "channel_id" not in data:
                 continue
