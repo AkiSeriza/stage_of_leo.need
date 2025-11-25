@@ -53,6 +53,7 @@ def tierlistmake(results,songs):
         draw.text((x, y), tierlabel, fill=(255,255,255), font=font)
         print(tier)
         for song in tiers[tier]:
+            print(f"{song} being downloaded")
             url = songs_list[song]["link"]
             print(f"downloaded {url} for {song}")
             response = requests.get(url)
