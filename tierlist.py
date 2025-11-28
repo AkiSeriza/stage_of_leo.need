@@ -331,7 +331,7 @@ class TierList(commands.Cog):
         )
 
 
-    @tasks.loop(seconds=5)
+    @tasks.loop(minutes=1)
     async def daily_tierlist_task(self):
         setups = load_json(SERVER_SETUP_PATH)
         pacific_tz = pytz.timezone("US/Pacific")
