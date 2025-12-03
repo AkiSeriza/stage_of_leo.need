@@ -309,6 +309,32 @@ class TierList(commands.Cog):
             auto_archive_duration=1440,
             reason="Tierlist Discussion"
         )
+
+        server_setups = load_json(SERVER_SETUP_PATH).get(server_id, {})
+        thresholds = server_setups.get("Thresholds", Standard_score["Thresholds"])
+        assign_tiers_for_server(server_id, thresholds)
+        server_dir = os.path.join(DB_DIR, server_id)
+        tier_csv = os.path.join(server_dir, "tier.csv")
+        if not os.path.exists(tier_csv):
+            await thread.send(
+                "No tierlist CSV found. Wait for some votes or force a post.",
+            )
+        img = tlm(tier_csv, SONG_LIST_PATH)
+        img_path = os.path.join(server_dir, "tierlist.png")
+        img.save(img_path)
+        server = self.bot.get_guild(int(server_id))
+        if server is None:
+            await thread.send("Bot is not in this server.")
+        embed = discord.Embed(
+            color=0x4169E1,
+            title=f"Current Tierlist for {server.name}"
+        )
+        img_path = os.path.join(server_dir, "tierlist.png")
+        img.save(img_path)
+        file = File(img_path, filename="tierlist.png")
+        embed.set_image(url="attachment://tierlist.png") 
+        embed.set_footer(text="Use /tierlistrevote to vote on a previously voted song!", icon_url="https://i.namu.wiki/i/J4ZwMcNsF1aC5H9jpfYiKZqOhjI2ucqXytSd5zAfx-Qy6GTLXdwvW86KW_lDthZChvdwMoU4cXK9hpJhKEzYsA.webp")
+        await thread.send(embed=embed, file=file)
         await interaction.response.send_message(f"Forced tierlist to advance to {next_song}", ephemeral=True)
 
     @app_commands.command(name="tierlistrevote", description="Vote on any song")
@@ -367,7 +393,32 @@ class TierList(commands.Cog):
                 name=f"Tierlist Discussion: {next_song}",
                 auto_archive_duration=1440,
                 reason="Tierlist Discussion"
+            )        
+            server_setups = load_json(SERVER_SETUP_PATH).get(server_id, {})
+            thresholds = server_setups.get("Thresholds", Standard_score["Thresholds"])
+            assign_tiers_for_server(server_id, thresholds)
+            server_dir = os.path.join(DB_DIR, server_id)
+            tier_csv = os.path.join(server_dir, "tier.csv")
+            if not os.path.exists(tier_csv):
+                await thread.send(
+                    "No tierlist CSV found. Wait for some votes or force a post.",
+                )
+            img = tlm(tier_csv, SONG_LIST_PATH)
+            img_path = os.path.join(server_dir, "tierlist.png")
+            server = self.bot.get_guild(int(server_id))
+            img.save(img_path)
+            embed = discord.Embed(
+                color=0x4169E1,
+                title=f"Current Tierlist for {server.name}"
             )
+            img_path = os.path.join(server_dir, "tierlist.png")
+            img.save(img_path)
+            file = File(img_path, filename="tierlist.png")
+            embed.set_image(url="attachment://tierlist.png") 
+            embed.set_footer(text="Use /tierlistrevote to vote on a previously voted song!", icon_url="https://i.namu.wiki/i/J4ZwMcNsF1aC5H9jpfYiKZqOhjI2ucqXytSd5zAfx-Qy6GTLXdwvW86KW_lDthZChvdwMoU4cXK9hpJhKEzYsA.webp")
+            await thread.send(embed=embed, file=file)
+            
+            
 
     @daily_tierlist_task.before_loop
     async def before_daily_tierlist(self):
