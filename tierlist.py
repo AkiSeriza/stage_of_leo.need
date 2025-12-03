@@ -18,6 +18,15 @@ SONGSCORES_PATH = os.path.join(DB_DIR, "songscores.json")
 PHOTO_FOLDER = os.path.join(BASE_DIR, "Databases", "Photos")
 REVOTES_PATH = os.path.join(DB_DIR, "revotes.json")
 
+pjsk_colors = {
+    "VS": 0x00CDBA,
+    "L":  0x4455DD,
+    "M":  0x6CCB20,
+    "V":  0xEE1166,
+    "W":  0xFF9900,
+    "N":  0x884499
+}
+
 def load_revotes():
     return load_json(REVOTES_PATH)
 
@@ -113,7 +122,7 @@ def tierlistembed(selected_song):
     embed = discord.Embed(
         title=selected_song,
         description=f"[{song.get('eng', 'No English title')}]({song.get('yt', '')})",
-        color=0x4169E1
+        color=pjsk_colors[song["unit"]]
     )
     embed.add_field(name="", value=song.get("Commission", "-"), inline=False)
     embed.add_field(name="**Arranger**", value=song.get("Arranger", "-"), inline=True)
@@ -131,8 +140,6 @@ class RevoteSelect(discord.ui.Select):
         song_list = load_json(SONG_LIST_PATH)
         votes_data = load_json(VOTES_PATH)
         server_id_str = str(server_id)
-
-        # Only keep songs that have votes in this server
         filtered_songs = [
             song for song in all_songs
             if votes_data.get(song, {}).get(server_id_str)
@@ -274,7 +281,6 @@ class TierList(commands.Cog):
         img = tlm(tier_csv, SONG_LIST_PATH)
         img_path = os.path.join(server_dir, "tierlist.png")
         img.save(img_path)
-        """await interaction.followup.send(file=discord.File(img_path))"""
         embed = discord.Embed(
             color=0x4169E1,
             title=f"{interaction.guild}'s Tierlist"
