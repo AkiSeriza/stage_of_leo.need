@@ -1,53 +1,40 @@
-import csv
+
 from PIL import Image, ImageDraw, ImageFont
 import math
 import requests
 from io import BytesIO
+import os
 import json
+from collections import OrderedDict
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_DIR = os.path.join(BASE_DIR, "Databases", "Tierlist")
+SONG_LIST_PATH = os.path.join(DB_DIR, "songslist.json")
 tier_colors = {
-    "S+": (65, 105, 225),  
-    "S": (56, 84, 168), 
-    "A": (50, 69, 128),   
-    "B": (37, 49, 84), 
-    "C": (26, 27, 54), 
-    "D": (13, 11, 23),  
-    }
-def tierlistmake(results,songs):
-    print("made it in")
+    "SSS": (65, 105, 225),  
+    "S+": (56, 84, 168), 
+    "S": (50, 69, 128),   
+    "A": (37, 49, 84), 
+    "B": (26, 27, 54), 
+    "C": (13, 11, 23),  
+    "D": (5, 5, 11),  
+}
+tier_order = ["SSS", "S+", "S", "A", "B", "C", "D"]
+def tlm(tiers, songs):
+    tiers = OrderedDict((key, tiers[key]) for key in tier_order if key in tiers)
     with open(songs, "r") as f:
         songs_list = json.load(f)
     width = 1300
     rows = 0
-    print("made it in 1")
-    tiers = {
-        "S+":[],
-        "S":[],
-        "A":[],
-        "B":[],
-        "C":[],
-        "D":[],
-    }
-    print("made it in open")
-    with open(results, "r") as f:
-        reader = csv.reader(f)
-        next(reader)
-        for i in reader:
-            print(i)
-            tiers[i[0]].append(i[1])
     for tier in tiers:
         rows += 1 if math.ceil(len(tiers[tier])/7) == 0 else math.ceil(len(tiers[tier])/7)
-    print("help")
     height = rows*150
-    print("rows =", rows)
     tierlistimage = Image.new("RGB",(width,height), (36, 45, 51))
     draw = ImageDraw.Draw(tierlistimage)
     lowerbound, upperbound = 0,0
     font = ImageFont.truetype("DejaVuSans-Bold.ttf", size=40)
-    print("made it in 2")
     row, column = 0, 0 
     for tier in tiers:
-        print("made it in 3")
         lowerbound += 1 if math.ceil(len(tiers[tier])/7) == 0 else math.ceil(len(tiers[tier])/7)
         upperbound = lowerbound - (1 if math.ceil(len(tiers[tier])/7) == 0 else math.ceil(len(tiers[tier])/7)) 
         draw.rectangle((0,upperbound*150,250,lowerbound*150),tier_colors[tier])
@@ -76,4 +63,3 @@ def tierlistmake(results,songs):
         column = 0
         row +=1
     return tierlistimage
-
