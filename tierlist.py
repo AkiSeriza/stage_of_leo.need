@@ -162,8 +162,7 @@ class RevoteDropdown(discord.ui.View):
     async def select_callback(self, interaction: discord.Interaction):
         chosen = self.select.values[0]
 
-        # Use followup if already responded
-        await interaction.response.defer(ephemeral=True)  # ephemeral response
+        await interaction.response.defer(ephemeral=True)
         await self.cog.send_embed(interaction, chosen, interaction.channel.id, boolresponse=True)
 
     async def prev_page(self, interaction: discord.Interaction):
@@ -299,7 +298,7 @@ class TierList(commands.Cog):
         for guild_id in self.server_data:
             guild = self.bot.get_guild(int(guild_id))
             if guild is None:
-                break
+                continue
             else:
                 if self.server_data[guild_id]["Time"] == hours_minutes:
                     channel_id = int(self.server_data[guild_id].get("Channel"))
@@ -383,7 +382,9 @@ class TierList(commands.Cog):
         name="adminforcetierlist",
         description="Send the next song in the server's configured channel"
     )
+    @app_commands.checks.has_permissions(administrator=True)
     async def adminforcetierlist(self, interaction: discord.Interaction):
+        self.server_data = loadJSON(SERVER_SETUP_PATH)
         guild_id = interaction.guild.id
         guild_id = str(guild_id)
         channel_id = self.server_data[guild_id].get("Channel")
@@ -450,7 +451,7 @@ class TierList(commands.Cog):
     async def servertierlist(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         server_votes = loadJSON(SERVER_VOTES)
-        server_id = interaction.guild_id
+        server_id = str(interaction.guild_id)
         requested_tierlist = server_votes[server_id]
         img = tlm(requested_tierlist,SONG_LIST_PATH)
         buffer = BytesIO()
@@ -496,6 +497,9 @@ class TierList(commands.Cog):
         )
         file = File(buffer, filename="tierlist.png")
         await interaction.followup.send(embed=embed, file=file)
+
+
+        
 
 async def setup(bot):
     await bot.add_cog(TierList(bot))

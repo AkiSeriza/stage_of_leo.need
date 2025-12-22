@@ -28,6 +28,7 @@ def tlm(tiers, songs):
     rows = 0
     for tier in tiers:
         rows += 1 if math.ceil(len(tiers[tier])/7) == 0 else math.ceil(len(tiers[tier])/7)
+        print(f"{tier} has {rows} rows")
     height = rows*150
     tierlistimage = Image.new("RGB",(width,height), (36, 45, 51))
     draw = ImageDraw.Draw(tierlistimage)
