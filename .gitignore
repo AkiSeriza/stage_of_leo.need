@@ -1,0 +1,26 @@
+# Environment
+.env
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# IDE
+.vscode/
+
+# SQLite
+Databases/economy.sqbpro
+Databases/economy.db
+*.db-wal
+*.db-shm
+*.db-journal
+
+# Temporary user data
+Databases/usersfortune.json
+
+# Generated content
+Databases/Photos/
+Databases/QOTD/
+Databases/Tierlist/

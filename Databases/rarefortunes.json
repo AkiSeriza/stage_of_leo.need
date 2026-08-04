@@ -1,0 +1,17 @@
+{
+    "goldenichi":{
+        "character": "Golden Hoshino Ichika",
+        "thumbnailurl":"https://cdn.discordapp.com/attachments/1431289615528231145/1533674451659522199/imageedit_1_6803891770.png?ex=6a715923&is=6a7007a3&hm=6bfaf5f30f90828b0450ca591e40d7e8440a46f9d0520a9d60ad18cf68d71f27&",
+        "entry": "\"And now, starting with an 'I Love You', Let it shine on us more. I want to try believing in this kind of unchanging love and hope again.\"",
+        "colour":"#EFBF04",
+        "balChange": 1000000
+    },
+    
+    "feedme":{
+        "character": "Reimu",
+        "thumbnailurl":"https://cdn.discordapp.com/avatars/748365536680738878/d898ce24323ffc0e2c483072276b3c10.png",
+        "entry": "\"feed me\"",
+        "colour":"#1F1E33",
+        "balChange": -100000
+    }
+}
