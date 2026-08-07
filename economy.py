@@ -388,7 +388,7 @@ class Economy(commands.Cog):
         await self.db.write("UPDATE econ SET Alertness = Alertness - 1 WHERE Alertness > 0")
         await self.db.write("""
             UPDATE bankaccounts
-            SET Balance = Balance * (banks.InterestRate)
+            SET Balance = FLOOR(Balance * (banks.InterestRate))
             FROM banks
             WHERE bankaccounts.BankType = banks.ShortName;
         """)
