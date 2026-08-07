@@ -49,7 +49,7 @@ class Economy(commands.Cog):
         await self.db.write("UPDATE econ SET Alertness = Alertness - 1 WHERE Alertness > 0")
         await self.db.write("""
             UPDATE bankaccounts
-            SET Balance = Balance * (banks.InterestRate)
+            SET Balance = FLOOR(Balance * (banks.InterestRate))
             FROM banks
             WHERE bankaccounts.BankType = banks.ShortName;
         """)
@@ -80,6 +80,7 @@ class Economy(commands.Cog):
         if check1 >=5:
             await interaction.response.send_message(content="Oopsie! You got caught ^^")
             await self.db.write("UPDATE econ SET Wantedness = Wantedness + 5 WHERE UserID = ?", (current_time,))
+            return
         stealbal = check[0]
         if stealbal <= 0:
             await interaction.response.send_message(content="They're broke, sadly", ephemeral=True)
@@ -103,6 +104,12 @@ class Economy(commands.Cog):
         print(target)
         robber = await self.db.fetchone("SELECT u.Wantedness, u.LuckModifier FROM econ u WHERE u.UserID = ?", (interaction.user.id,))
         print(robber)   
+        assetchance = random.randint(1, 10)
+        if robber[0] >= 7 or robber[0] >= assetchance :
+            await interaction.response.send_message(content=f"FREEZE! THIS IS AN ASSET FREEZE!", ephemeral=True) 
+            await self.db.write("DELETE FROM bankaccounts WHERE UserID = ?",(interaction.user.id,))
+            await self.db.write("UPDATE econ SET balance = FLOOR(balance/2) WHERE UserID = ?",(interaction.user.id,) )
+            return
         if target is None:
             await interaction.response.send_message(content="The user does not have an account with that bank.", ephemeral=True)
             return
@@ -115,18 +122,12 @@ class Economy(commands.Cog):
         target[3] = SecurityModifier
         """
         print("Ok it got here")
-        targetmod = 7 - target[2] - target[3]
-        robbmod = 8 - robber[0] + robber[1]
-        print(f"Target mod: {targetmod}, Robber mod: {robbmod}")
-
-        chance =  max((7- target[2] - target[3]),1) * robber[0] + robber[1] 
+        base_chance = 25
+        target_defense = target[2] + target[3] 
+        chance = base_chance - (target_defense * 3) - (robber[0] * 2) + (robber[1] * 4)
+        chance = max(5, min(45, chance))
         print(chance)
         roll = random.randint(1, 50)
-        if robber[0] >= 7:
-            await interaction.response.send_message(content=f"FREEZE! THIS IS AN ASSET FREEZE!", ephemeral=True) 
-            await self.db.write("DELETE FROM bankaccounts WHERE UserID = ?",(interaction.user.id,))
-            await self.db.write("UPDATE econ SET balance = FLOOR(balance/2) WHERE UserID = ?",(interaction.user.id,) )
-            return
         if roll <= chance:
             robamount = math.floor(target[1] * random.uniform(0.2, 0.3))
             await self.db.bank_deposit(user.id, -robamount, int(time.time()), bank,1)
@@ -335,8 +336,8 @@ class Economy(commands.Cog):
             await interaction.response.send_message(f"Successfully deposited {amount} to {bank}.", ephemeral=True)
 
     @app_commands.autocomplete(bank = shared_bank_autocomplete)
-    @app_commands.command(name="ichiwithraw", description="Withraws a select number of Ichicoins from a bank of your choosing")
-    async def ichiwithraw(self, interaction: discord.Interaction, bank: str, amount: int):
+    @app_commands.command(name="ichiwithdraw", description="Withdraws a select number of Ichicoins from a bank of your choosing")
+    async def ichiwithdraw(self, interaction: discord.Interaction, bank: str, amount: int):
         amount = -amount
         current_time = int(time.time())
         user = interaction.user.id
