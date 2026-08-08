@@ -39,7 +39,7 @@ class Economy(commands.Cog):
         print(self.sets)
         current_time = int(time.time())
         for i in self.sets:
-            await self.db.change_balance(i,150,"Message Sent", current_time)
+            await self.db.change_balance(i,250,"Message Sent", current_time)
         self.sets = set()
 
     @tasks.loop(hours=1)
@@ -112,7 +112,7 @@ class Economy(commands.Cog):
             return
         target = await self.db.fetchone("SELECT u.UserID, ba.Balance, u.Alertness, b.SecurityModifier FROM bankaccounts ba INNER JOIN banks b ON ba.BankType = b.ShortName INNER JOIN econ u ON ba.UserID = u.UserID WHERE u.UserID = ? AND b.ShortName = ?", (user.id, bank))
         print(target)
-        robber = await self.db.fetchone("SELECT u.Wantedness, u.LuckModifier FROM econ u WHERE u.UserID = ?", (interaction.user.id,))
+        robber = await self.db.fetchone("SELECT u.Wantedness, u.Luck FROM econ u WHERE u.UserID = ?", (interaction.user.id,))
         print(robber)   
         assetchance = random.randint(1, 10)
         if robber[0] >= 7 or robber[0] >= assetchance :
@@ -131,6 +131,7 @@ class Economy(commands.Cog):
         robber[0] = Wantedness 
         target[3] = SecurityModifier
         """
+
         print("Ok it got here")
         base_chance = 25
         target_defense = target[2] + target[3] 
@@ -411,12 +412,41 @@ class Economy(commands.Cog):
         if amount == bankbalance:
             await self.db.write("DELETE FROM bankaccounts WHERE UserID = ? AND BankType = ?",(user,bank))
         await interaction.response.send_message(f"{bank} would like to thank you for choosing them. {amount} Ichcicoins have been withdrawn from your bank accout with a fee of {amount*fee}.")
+             
+    @app_commands.autocomplete(bank=shared_bank_autocomplete)
+    @app_commands.command(name="ichibankinfo", description="Displays your current Ichicoins balance")
+    async def ichibankinfo(self, interaction: discord.Interaction, bank: str):
+        bankdata =  await self.db.fetchall("SELECT * FROM banks WHERE ShortName = ?", (bank,))
+        print(bankdata)
+        if not bankdata:
+            await interaction.response.send_message("Bank does not exist", ephemeral=True)
+            return
+        else:
+            bankdata = bankdata[0]
+        embed = discord.Embed(
+            color=discord.Color.from_str(bankdata[9]),
+            title=bankdata[0],
+            description=f"_{bankdata[8]}_"
+        )
+        embed.set_thumbnail(url=bankdata[10])
+        embed.add_field(name="Initialism", value=bankdata[1])
+        print(
+            f"{(bankdata[2] - 1) * 100:.3f}%/Hour; {(bankdata[2] ** 24 - 1) * 100:.3f}%/day"
+        )
+        embed.add_field(name="Interest Rate", value=f"{(bankdata[2] - 1) * 100:.3f}%/Hour; {(bankdata[2] ** 24 - 1) * 100:.3f}%/day")
+        embed.add_field(name="Withdrawal Fee", value=f"{(bankdata[3])*100}% of withdraw amount")
+        embed.add_field(name="Minimum Deposit", value=bankdata[4])
         
-        
-        
-
-    """@app_commands.command(name="ichibankinfo", description="Displays your current Ichicoins balance")
-    async def ichibankinfo(self, interaction: discord.Interaction):"""
+        if bankdata[5] < 0:
+            sec = "☆" * -bankdata[5]
+        elif bankdata[5] == 0:
+            sec = "--:--"
+        else:
+            sec = "★" * bankdata[5]
+    
+        embed.add_field(name="Security Quality", value=sec)
+        embed.add_field(name="Lock In Period", value=f"{format_timespan( bankdata[6])}")
+        await interaction.response.send_message(embed=embed)
      
     """@app_commands.command(name="ichiwork", description="Work to earn Ichicoins. Join the Ichiworkforce.")
     async def ichiwork(self, interaction: discord.Interaction):"""

@@ -127,7 +127,6 @@ def recalculate_tierlist_from_votes():
                         server_tierlist[tiers].append(song)
                         break
         write_file[server] = server_tierlist
-        print(server_scores)
     
     saveJSON(write_file,SERVER_VOTES)
     print("DEBUG: Tierlist recalculation completed")
@@ -152,12 +151,10 @@ class TierlistButtons(discord.ui.View):
                 print(f"DEBUG: Button clicked for tier {tier} on song {self.selected_song}")
                 user_votes = cog.user_votes.get(str(interaction.guild.id), {}).get(str(interaction.user.id), {})
                 sss_votes = user_votes.get("SSS", [])
-                print(sss_votes)
                 if tier == "SSS" and len(sss_votes) >= 7:
                     print(f"DEBUG: User {interaction.user.id} has too many SSS votes")
                     await interaction.followup.send(f"You already have 7 Votes of SSS; use /tierlistself to see which songs you have dedicated your SSS votes for!", ephemeral=True)
                     return 0
-                print("Why here")
                 await self.cog.register_vote(interaction.user.id, interaction.guild.id, self.selected_song, tier)
                 await interaction.followup.send(f"You voted {tier} for {self.selected_song}!", ephemeral=True)
             button.callback = button_callback
@@ -242,7 +239,7 @@ class TierList(commands.Cog):
             check = await self.db.fetchall("SELECT LastVoteTime FROM econ WHERE UserID = ?", (user,))
             check = check[0][0] if check else 0
             if int(time.time()) - check > 86400:
-                await self.db.change_balance(user,50000,"Tierlist Participation", int(time.time()))
+                await self.db.change_balance(user,10000,"Tierlist Participation", int(time.time()))
                 await self.db.write("UPDATE econ SET LastVoteTime = ? WHERE UserID = ?", (int(time.time()),user))
             print(check)
             user = str(user)
