@@ -4,6 +4,7 @@
         "thumbnailurl":"https://static.wikitide.net/projectsekaiwiki/6/6c/Stamp0382.png",
         "entry":"\"I guess I never realized how lucky I am. Just walking and talking with everyone... it really makes me happy.\"",
         "colour":"#33AAEE",
+        "luck": 3,
         "balChange": 3000
     },
     "ichibass":{
@@ -11,6 +12,7 @@
         "thumbnailurl":"https://static.wikitide.net/projectsekaiwiki/thumb/8/88/Stamp0661.png/128px-Stamp0661.png",
         "entry":"\"You're so down to earth, Shiho. Or should I say, down to play bass.\"",
         "colour":"#33AAEE",
+        "luck": 2,
         "balChange": 3000
     },
     "ichitempremental":{
@@ -18,6 +20,7 @@
         "thumbnailurl":"https://static.wikitide.net/projectsekaiwiki/a/a0/Stamp0443.png",
         "entry":"\"I've come to realise singing songs about emotions you're not familiar with is actually quite difficult\"",
         "colour":"#33AAEE",
+        "luck": 2,
         "balChange": 3000
     },
     "honalead":{
@@ -25,6 +28,7 @@
         "thumbnailurl": "https://static.wikitide.net/projectsekaiwiki/thumb/2/21/Stamp0901.png/232px-Stamp0901.png",
         "entry":"\"You can't live life in fear of being hurt.\"",
         "colour":"#EE6666",
+        "luck": 1,
         "balChange": 1000
     },
     "honakindness":{
@@ -32,6 +36,7 @@
         "thumbnailurl":"https://static.wikitide.net/projectsekaiwiki/6/6a/Stamp0812.png",
         "entry":"\"There are many different ways of expressing kindness, you can empathize with someone who's troubled about something, make them smile or be somewhat direct. As long as it was done with that person's best interests at heart, no matter what form it takes, it's a form of kindness.\"",
         "colour":"#EE6666",
+        "luck": 1,
         "balChange": 1000
     },
     "shihoserious":{
@@ -39,6 +44,7 @@
         "thumbnailurl": "https://static.wikitide.net/projectsekaiwiki/6/62/Stamp0885.png",
         "entry":"\"...Everyone, let's make this performance a great one.\"",
         "colour":"#BBDD22",
+        "luck": 0,
         "balChange": 1000
     },
     "sakifunny":{
@@ -46,6 +52,7 @@
         "thumbnailurl": "https://static.wikitide.net/projectsekaiwiki/thumb/1/1d/Stamp0900.png/233px-Stamp0900.png",
         "entry":"\"Freaking awesome...! We totally crushed it!\"",
         "colour":"#FFDD44",
+        "luck": 1,
         "balChange": 1000
     },
     "minoridetermined":{
@@ -53,6 +60,7 @@
         "thumbnailurl":"https://static.wikitide.net/projectsekaiwiki/0/0d/Stamp0691.png",
         "entry":"\"Don't give up on your dreams Minorinrin! Hanasato Minori aka Minorin, the zero experience amateur idol of MORE MORE JUMP! That's me!\"",
         "colour": "#FFCCAA",
+        "luck": 0,
         "balChange": 0
     },
     "haruhardwork":{
@@ -60,6 +68,7 @@
         "thumbnailurl":"https://static.wikitide.net/projectsekaiwiki/7/7f/Stamp0904.png",
         "entry":"\"Even if things don't go your way, you keep working more and more.\"",
         "colour":"#99CCFF",
+        "luck": 1,
         "balChange": 500
     },
     "kohaglam":{
@@ -67,16 +76,19 @@
         "thumbnailurl":"https://static.wikitide.net/projectsekaiwiki/8/87/Stamp0453.png",
         "entry":"\"I made it shine dazzlingly, How nice, I envy it, that carat. I monopolize your gaze so naturally that it draws attention.\"",
         "colour":"#FF6699",
+        "luck": 0,
         "balChange": 500
     },
     "comeheremafuyuchan":{
-        "entry": "come here"
+        "entry": "come here",
+        "luck": -2
     },
     "tsukasapride":{
         "character":"Tenma Tsukasa",
         "thumbnailurl":"https://static.wikitide.net/projectsekaiwiki/a/a5/Stamp0149.png",
         "entry":"\"I make a pose like I’m gonna save everyone. How about this smile, it’s not gonna crumble at all!\"",
         "colour":"#FFBB00",
+        "luck": 0,
         "balChange": 500
     },
     "nenewishful":{
@@ -84,6 +96,7 @@
         "thumbnailurl":"https://static.wikitide.net/projectsekaiwiki/6/6a/Stamp0570.png",
         "entry": "\"Wish upon a star for a magical tomorrow, Catch the gleam in our dreams and tears, The stars so bright lighting up the darkness\"",
         "colour": "#33DD99",
+        "luck": 0,
         "balChange": "500"
     },
     "mikudepressed":{
@@ -91,6 +104,7 @@
         "thumbnailurl":"https://static.wikitide.net/projectsekaiwiki/d/db/Stamp0489.png",
         "entry":"\"I've got no money, and so throughout the day again, I sing songs of praise to indolence; Still without grasping the meaning of life, I come to an epiphany that it's pointless and take a breath. Are these wounds really ok to be expressed with words like \"I'm lonely\"; Carrying nothing but such obstinacy, today again I sleep alone on my bed\"",
         "colour":"#884499",
+        "luck": -1,
         "balChange": 500
     },
     "kanapassion":{
@@ -98,6 +112,7 @@
         "thumbnailurl":"https://static.wikitide.net/projectsekaiwiki/d/d5/Stamp0721.png",
         "entry": "\"The world is shining, don't forget that. The world is squirming, don't forget that too. You aren't alone in the world, don't forget that as well. And make sure to not forget your own passion.\"",
         "colour":"#BB6688",
+        "luck": 1,
         "balChange": 500
     },
     "kananoodle":{
@@ -105,6 +120,7 @@
         "thumbnailurl":"https://static.wikitide.net/projectsekaiwiki/2/2b/Stamp0199.png",
         "entry": "\"_noodles..._\"",
         "colour":"#BB6688",
+        "luck": 3,
         "balChange": -1000
     },
     "mafufuckyou":{
@@ -112,6 +128,7 @@
         "thumbnailurl": "https://static.wikitide.net/projectsekaiwiki/9/97/Stamp0415.png",
         "entry": "\"バイオレンス　バイオレンス　何も 分かんない　分かんないよ　難解愛をロスト　愛をロスト　愛して 愛して\"",
         "colour": "#8888CC",
+        "luck": 0,
         "balChange": -10000
     },
     "mizurun":{
@@ -119,6 +136,7 @@
         "thumbnailurl":"https://static.wikitide.net/projectsekaiwiki/thumb/6/68/Stamp0706.png/156px-Stamp0706.png",
         "entry":"\"I believe that it's ok to run when you're faced with an unbearable amount of pain and suffering that's going to take your life force away\"",
         "colour":"#DDAACC",
+        "luck": 1,
         "balChange": 1500
     }
 }
