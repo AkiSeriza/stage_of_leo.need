@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import aiosqlite
 import bot
 from database import Database
+import html
 
 load_dotenv()
 
@@ -23,6 +24,7 @@ extensions = [
     "fun",
     "qotd",
     "starboard",
+    "jobs",
     ###"songguess",
     'tierlist',
     'economy',

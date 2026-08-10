@@ -41,7 +41,7 @@ class Economy(commands.Cog):
         for i in self.sets:
             await self.db.change_balance(i,250,"Message Sent", current_time)
         self.sets = set()
-
+    
     @tasks.loop(hours=1)
     async def refresh(self):
         print("HI")
@@ -56,16 +56,14 @@ class Economy(commands.Cog):
         """)
         print(f"Refreshed Wantedness and Alertness at {datetime.datetime.fromtimestamp(current_time)}")
 
-    """class bankinfoview(discord.ui.View):
-        def __init__(self, timeout = 600):
-            super().__init__(timeout=timeout)
-            @discord.ui.button"""
-
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
+        print(message.content)
+        if message.attachments:
+            for i in message.attachments:
+                print(i.url)
         self.sets.add(message.author.id)
-        print("recieved")
 
     @app_commands.command(name="ichirob", description="Rob a user of their IchiCoins")
     async def ichirob(self, interaction: discord.Interaction, target: discord.User):
@@ -411,7 +409,7 @@ class Economy(commands.Cog):
         await self.db.change_balance(interaction.user.id, -(int(amount*fee)), f"Paid fee to {bank}", current_time)
         if amount == bankbalance:
             await self.db.write("DELETE FROM bankaccounts WHERE UserID = ? AND BankType = ?",(user,bank))
-        await interaction.response.send_message(f"{bank} would like to thank you for choosing them. {amount} Ichcicoins have been withdrawn from your bank accout with a fee of {amount*fee}.")
+        await interaction.response.send_message(f"{bank} would like to thank you for choosing them. {amount} Ichcicoins have been withdrawn from your bank accout with a fee of {amount*fee}.", ephemeral=True)
              
     @app_commands.autocomplete(bank=shared_bank_autocomplete)
     @app_commands.command(name="ichibankinfo", description="Displays your current Ichicoins balance")
@@ -447,9 +445,6 @@ class Economy(commands.Cog):
         embed.add_field(name="Security Quality", value=sec)
         embed.add_field(name="Lock In Period", value=f"{format_timespan( bankdata[6])}")
         await interaction.response.send_message(embed=embed)
-     
-    """@app_commands.command(name="ichiwork", description="Work to earn Ichicoins. Join the Ichiworkforce.")
-    async def ichiwork(self, interaction: discord.Interaction):"""
 
     @app_commands.command(name="ichitransfer", description="Transfers a select number of Ichicoins to a user of your choosing")
     async def ichitransfer(self, interaction: discord.Interaction, user: discord.User, amount: int):

@@ -10,12 +10,14 @@ class Database:
     async def fetchone(self, query, params=()):
         cursor = await self.conn.execute(query, params)
         row = await cursor.fetchone()
-        await cursor.close()   # <-- add this too
+        await cursor.close()
         return row
 
     async def fetchall(self, query, params=()):
         cursor = await self.conn.execute(query, params)
-        return await cursor.fetchall()
+        rows = await cursor.fetchall()
+        await cursor.close()
+        return rows
 
     async def commit(self):
         await self.conn.commit()
