@@ -124,7 +124,7 @@ class Database:
         print(f"Bank {bank} has received request")
 
         if current_bank_balance is None:
-            return DatabaseError("Bank not found.")
+            raise DatabaseError("Bank not found.")
 
         balance = (
             current_bank_balance[0]
