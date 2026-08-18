@@ -4,16 +4,14 @@
         "thumbnailurl":"https://cdn.discordapp.com/attachments/1431289615528231145/1533674451659522199/imageedit_1_6803891770.png?ex=6a715923&is=6a7007a3&hm=6bfaf5f30f90828b0450ca591e40d7e8440a46f9d0520a9d60ad18cf68d71f27&",
         "entry": "\"And now, starting with an 'I Love You', Let it shine on us more. I want to try believing in this kind of unchanging love and hope again.\"",
         "colour":"#EFBF04",
-        "luck": 7,
-        "balChange": 100000
+        "balChange": 1000000
     },
     
     "feedme":{
         "character": "Reimu",
-        "thumbnailurl":"https://media.discordapp.net/attachments/959241547747061792/1535437624787865660/IMG_1648.png?ex=6a77c338&is=6a7671b8&hm=3db4e78659287cb291271199c0b5c6df9fe2a5006939418b7fb9ae7b642c5340&=&format=webp&quality=lossless",
+        "thumbnailurl":"https://cdn.discordapp.com/avatars/748365536680738878/d898ce24323ffc0e2c483072276b3c10.png",
         "entry": "\"feed me\"",
         "colour":"#1F1E33",
-        "luck": -7,
-        "balChange": -10000
+        "balChange": -100000
     }
 }
