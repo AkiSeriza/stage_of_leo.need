@@ -1,9 +1,9 @@
 
+import asyncio
 import discord
-import aiosqlite
 from discord.ext import commands
 import random
-from database import Database
+from database import Database, DatabaseError
 from discord.ext import commands, tasks
 from discord import app_commands
 import time
@@ -32,6 +32,7 @@ class Economy(commands.Cog):
         self.refresh.start()
         self.textcalcs.start()
         self.sets = set()
+
 
     @tasks.loop(seconds = 60)
     async def textcalcs(self):
@@ -66,20 +67,20 @@ class Economy(commands.Cog):
         current_time = time.time()
         user = interaction.user.id
         targetID = target.id
-        row = await self.db.fetchone("SELECT LastStealTime FROM econ WHERE UserID = ?", (user,))
+        row = await self.db.fetchone("SELECT LastStealTime FROM econ WHERE UserID = $1", user)
         laststeal = row[0] if row and row[0] is not None else 0
         if current_time - laststeal < 60:
             await interaction.response.send_message("You can chill out on robbing people, y'know?")
             return
-        check = await self.db.fetchone("SELECT Balance FROM econ where UserID= ?", (targetID,))
-        check1 = await self.db.fetchone("SELECT Wantedness FROM econ where UserID= ?", (user,)) 
+        check = await self.db.fetchone("SELECT Balance FROM econ where UserID = $1", targetID)
+        check1 = await self.db.fetchone("SELECT Wantedness FROM econ where UserID = $1", user)
         check1 = check1[0] if check1 else 0
         if check == None:
             await interaction.response.send_message(content="The User does not have an open account")
             return
         if check1 >=5:
             await interaction.response.send_message(content="Oopsie! You got caught ^^")
-            await self.db.write("UPDATE econ SET Wantedness = Wantedness + 5 WHERE UserID = ?", (current_time,))
+            await self.db.write("UPDATE econ SET Wantedness = Wantedness + 5 WHERE UserID = $1", current_time)
             return
         stealbal = check[0]
         if stealbal <= 0:
@@ -91,7 +92,7 @@ class Economy(commands.Cog):
         reason2 = f"Balance stolen from {targetID}"
         await self.db.change_balance(targetID, -stealbal, reason1, current_time)
         await self.db.change_balance(user, stealbal, reason2, current_time)
-        await self.db.write("UPDATE econ SET LastStealTime = ?, Wantedness = Wantedness + 3 WHERE UserID = ?", (current_time,user))
+        await self.db.write("UPDATE econ SET LastStealTime = $1, Wantedness = Wantedness + 3 WHERE UserID = $2", current_time, user)
         await interaction.response.send_message(content=f"Stole {stealbal} from {target.name}")
 
 
@@ -100,15 +101,15 @@ class Economy(commands.Cog):
     @app_commands.command(name="ichiheist", description="Attempt to rob a bank account for Ichicoins")
     async def ichiheist(self, interaction: discord.Interaction, bank: str, user: discord.User):
         print(f"User {interaction.user.id} is attempting to rob {user.id}'s bank account at {bank}")
-        target = await self.db.fetchone("SELECT u.UserID, ba.Balance, u.Alertness, b.SecurityModifier FROM bankaccounts ba INNER JOIN banks b ON ba.BankType = b.ShortName INNER JOIN econ u ON ba.UserID = u.UserID WHERE u.UserID = ? AND b.ShortName = ?", (user.id, bank))
+        target = await self.db.fetchone("SELECT u.UserID, ba.Balance, u.Alertness, b.SecurityModifier FROM bankaccounts ba INNER JOIN banks b ON ba.BankType = b.ShortName INNER JOIN econ u ON ba.UserID = u.UserID WHERE u.UserID = $1 AND b.ShortName = $2", user.id, bank)
         print(target)
-        robber = await self.db.fetchone("SELECT u.Wantedness, u.LuckModifier FROM econ u WHERE u.UserID = ?", (interaction.user.id,))
+        robber = await self.db.fetchone("SELECT u.Wantedness, u.LuckModifier FROM econ u WHERE u.UserID = $1", interaction.user.id)
         print(robber)   
         assetchance = random.randint(1, 10)
         if robber[0] >= 7 or robber[0] >= assetchance :
             await interaction.response.send_message(content=f"FREEZE! THIS IS AN ASSET FREEZE!", ephemeral=True) 
-            await self.db.write("DELETE FROM bankaccounts WHERE UserID = ?",(interaction.user.id,))
-            await self.db.write("UPDATE econ SET balance = FLOOR(balance/2) WHERE UserID = ?",(interaction.user.id,) )
+            await self.db.write("DELETE FROM bankaccounts WHERE UserID = $1", interaction.user.id)
+            await self.db.write("UPDATE econ SET balance = FLOOR(balance/2) WHERE UserID = $1", interaction.user.id)
             return
         if target is None:
             await interaction.response.send_message(content="The user does not have an account with that bank.", ephemeral=True)
@@ -133,37 +134,37 @@ class Economy(commands.Cog):
             await self.db.bank_deposit(user.id, -robamount, int(time.time()), bank,1)
             await self.db.change_balance(interaction.user.id, robamount, f"Bank Heist from {target[0]}", int(time.time()))
             await interaction.response.send_message(content=f"Successfully robbed {robamount} from {user.name}'s bank account at {bank}!")
-            await self.db.write("UPDATE econ SET Wantedness = Wantedness + 1 WHERE UserID = ?", (interaction.user.id,))
-            await self.db.write("UPDATE econ SET Alertness = Alertness + 1 WHERE UserID = ?", (user.id,))
+            await self.db.write("UPDATE econ SET Wantedness = Wantedness + 1 WHERE UserID = $1", interaction.user.id)
+            await self.db.write("UPDATE econ SET Alertness = Alertness + 1 WHERE UserID = $1", user.id)
         else:
             await interaction.response.send_message(content=f"Failed to rob {user.name}'s bank account at {bank}. Better luck next time!", ephemeral=True)  
-            await self.db.write("UPDATE econ SET Wantedness = 7 WHERE UserID = ?", (interaction.user.id,))
+            await self.db.write("UPDATE econ SET Wantedness = 7 WHERE UserID = $1", interaction.user.id)
 
     @app_commands.command(name="ichiportfolio", description="Show current your current bank and investment portfolio")
     async def ichiportfolio(self, interaction: discord.Interaction):
         await interaction.response.defer()
-
+        print("Hi")
         user = interaction.user.id
-        balance = await self.db.fetchone(
-            "SELECT Balance FROM econ WHERE UserID = ?",
-            (user,)
+        balance_row = await self.db.fetchone(
+            "SELECT Balance FROM econ WHERE UserID = $1",
+            user
         )
+        balance = balance_row[0] if balance_row else 0
         print(balance)
 
-        current_balance = balance[0] if balance else 0
+        current_balance = balance
         print(current_balance)
         embed = discord.Embed(
             title=f"{interaction.user.name}'s Balance",
             description=f"**Current Balance:** {current_balance} coins",
             color=discord.Color.gold()
         )
-        print(current_balance) 
         banklist = ""
         sum = 0
         for i in ["LNC", "MMS", "RDI", "BWS", "UC25"]:
             balance = await self.db.fetchone(
-                "SELECT Balance FROM bankaccounts WHERE UserID = ? AND BankType = ?",
-                (user, i)
+                "SELECT Balance FROM bankaccounts WHERE UserID = $1 AND BankType = $2",
+                user, i
             )
             balance = 0 if balance is None else balance[0]
             strings = f"**{i}** balance: {balance}"
@@ -171,7 +172,7 @@ class Economy(commands.Cog):
             sum += balance
         banklist = banklist + f"\nTotal Balance within Banks: {sum}"
         embed.add_field(name="Current Bank Balances",value=banklist)
-        wanted = await self.db.fetchone("SELECT Wantedness FROM econ WHERE UserID = ?", (interaction.user.id,))
+        wanted = await self.db.fetchone("SELECT Wantedness FROM econ WHERE UserID = $1", interaction.user.id)
         wanted = 0 if wanted is None else wanted[0]
         stars = "✰Clean Record" if wanted == 0 else "★" * wanted 
         embed.add_field(name="Wanted Level", value=stars)
@@ -188,11 +189,11 @@ class Economy(commands.Cog):
             """
             SELECT BalanceChange, BalanceAfter, Timestamp, Reason
             FROM balancehistory
-            WHERE Timestamp >= ? AND UserID = ?
+            WHERE Timestamp >= $1 AND UserID = $2
             ORDER BY Timestamp DESC
             LIMIT 100
             """,
-            (current_time - 86400, user)
+            current_time - 86400, user
         )
         print(f"Ledger for user {user}: {ledger}")
         collapsedLedger = []
@@ -330,7 +331,7 @@ class Economy(commands.Cog):
         current_time = int(time.time())
         user = interaction.user.id
         result = await self.db.bank_deposit(userID=user, deposit=amount, currenttime=current_time, bank=bank, isRob=0)
-        if isinstance(result, aiosqlite.Error):
+        if isinstance(result, DatabaseError):
             await interaction.response.send_message(str(result), ephemeral=True)
         else:
             await interaction.response.send_message(f"Successfully deposited {amount} to {bank}.", ephemeral=True)
@@ -342,7 +343,7 @@ class Economy(commands.Cog):
         current_time = int(time.time())
         user = interaction.user.id
         result = await self.db.bank_deposit(userID=user, deposit=amount, currenttime=current_time, bank=bank, isRob=0)
-        if isinstance(result, aiosqlite.Error):
+        if isinstance(result, DatabaseError):
             await interaction.response.send_message(str(result), ephemeral=True)
         else:
             await interaction.response.send_message(f"Successfully deposited {amount} to {bank}.", ephemeral=True)
@@ -353,13 +354,13 @@ class Economy(commands.Cog):
             await interaction.response.send_message("Transfer amount must be greater than zero.", ephemeral=True)
             return
         current_time = int(time.time())
-        current_bal = await self.db.fetchone("SELECT Balance FROM econ WHERE UserID = ?", (interaction.user.id,))
+        current_bal = await self.db.fetchone("SELECT Balance FROM econ WHERE UserID = $1", interaction.user.id)
         current_bal = current_bal[0] if current_bal else 0
         if current_bal < amount:
             await interaction.response.send_message("Insufficient funds for this transfer.", ephemeral=True)
             return
         result = await self.db.change_balance(userID=interaction.user.id, value=-amount, reason=f"Transfer to {user.name}", time=current_time)
-        if isinstance(result, aiosqlite.Error):
+        if isinstance(result, DatabaseError):
             await interaction.response.send_message(str(result), ephemeral=True)
         else:
             await self.db.change_balance(userID=user.id, value=amount, reason=f"Transfer from {interaction.user.name}", time=current_time)

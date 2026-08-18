@@ -2,7 +2,6 @@ import discord
 from discord.ext import commands
 import os
 from dotenv import load_dotenv
-import aiosqlite
 import bot
 from database import Database
 
@@ -11,7 +10,6 @@ load_dotenv()
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
-ECON = "Databases/economy.db"
 
 @bot.event
 async def on_ready():
@@ -45,9 +43,7 @@ async def close(ctx):
     await bot.close()
 
 async def main():
-    conn = await aiosqlite.connect(ECON)
-    await conn.execute("PRAGMA foreign_keys = ON")
-    bot.db = Database(conn)
+    bot.db = await Database.create()
     async with bot:
         await load_extensions()
         await bot.start(os.getenv("DISCORD_TOKEN"))

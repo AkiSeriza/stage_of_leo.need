@@ -81,13 +81,13 @@ class Fortunes(commands.Cog):
                 if fortunetitle == "mafufuckyou":
                     fortune["balChange"] = -random.randint(1,10000)
                 self.accounts[interaction.user.id] = fortunetitle
-                await self.db.change_balance(interaction.user.id, fortune["balChange"],"Fortune", int(time.time()))
+                await self.db.change_balance(interaction.user.id, fortune["balChange"], "Fortune", int(time.time()))
                 balChange = f"Your account has been credited {fortune['balChange']} Ichicoins for this fortune"
             else: 
                 fortunetitle = random.choice(list(self.rarefortunes.keys()))
                 fortune = self.rarefortunes[fortunetitle]
                 self.accounts[interaction.user.id] = fortunetitle
-                await self.db.change_balance(interaction.user.id, fortune["balChange"],"Fortune", int(time.time()))
+                await self.db.change_balance(interaction.user.id, fortune["balChange"], "Fortune", int(time.time()))
                 balChange = f"Your account has been credited {fortune['balChange']} Ichicoins for this rare fortune"
         else:
             print("Got here")
@@ -116,7 +116,7 @@ class Fortunes(commands.Cog):
                 if fortunetitle == "mafufuckyou":
                     fortune["balChange"] = -random.randint(1,10000)
                 self.forced.remove(interaction.user.id)
-                await self.db.change_balance(interaction.user.id, fortune["balChange"],"Fortune", int(time.time()))
+                await self.db.change_balance(interaction.user.id, fortune["balChange"], "Fortune", int(time.time()))
                 balChange = f"Your account has been credited {fortune['balChange']} Ichicoins for this fortune"
 
         print("Hi")

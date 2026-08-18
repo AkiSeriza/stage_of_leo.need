@@ -239,11 +239,11 @@ class TierList(commands.Cog):
     async def register_vote(self, user, server, song, vote):
         print(f"DEBUG: Registering vote for user {user} in server {server} on song {song} with tier {vote}")
         async with self.vote_lock:
-            check = await self.db.fetchall("SELECT LastVoteTime FROM econ WHERE UserID = ?", (user,))
+            check = await self.db.fetchall("SELECT LastVoteTime FROM econ WHERE UserID = $1", user)
             check = check[0][0] if check else 0
             if int(time.time()) - check > 86400:
-                await self.db.change_balance(user,50000,"Tierlist Participation", int(time.time()))
-                await self.db.write("UPDATE econ SET LastVoteTime = ? WHERE UserID = ?", (int(time.time()),user))
+                await self.db.change_balance(user, 50000, "Tierlist Participation", int(time.time()))
+                await self.db.write("UPDATE econ SET LastVoteTime = $1 WHERE UserID = $2", int(time.time()), user)
             print(check)
             user = str(user)
             server = str(server)
