@@ -330,9 +330,14 @@ class Economy(commands.Cog):
     async def ichideposit(self, interaction: discord.Interaction, bank: str, amount: int):
         current_time = int(time.time())
         user = interaction.user.id
-        result = await self.db.bank_deposit(userID=user, deposit=amount, currenttime=current_time, bank=bank, isRob=0)
+        #please work i want to make the logging neater
+        try:
+            result = await self.db.bank_deposit(userID=user, deposit=amount, currenttime=current_time, bank=bank, isRob=0)
+        except DatabaseError as e:
+            await interaction.response.send_message(str(e))
         if isinstance(result, DatabaseError):
             await interaction.response.send_message(str(result), ephemeral=True)
+            return
         else:
             await interaction.response.send_message(f"Successfully deposited {amount} to {bank}.", ephemeral=True)
 
