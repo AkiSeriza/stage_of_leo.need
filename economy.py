@@ -9,6 +9,7 @@ from discord import app_commands
 import time
 import math
 import datetime
+from humanfriendly import format_timespan
 
 texted_lat_minute = set()
 banks = [
@@ -39,7 +40,7 @@ class Economy(commands.Cog):
         print(self.sets)
         current_time = int(time.time())
         for i in self.sets:
-            await self.db.change_balance(i,150,"Message Sent", current_time)
+            await self.db.change_balance(i,250,"Message Sent", current_time)
         self.sets = set()
 
     @tasks.loop(hours=1)
@@ -50,11 +51,16 @@ class Economy(commands.Cog):
         await self.db.write("UPDATE econ SET Alertness = Alertness - 1 WHERE Alertness > 0")
         await self.db.write("""
             UPDATE bankaccounts
-            SET Balance = FLOOR(Balance * (banks.InterestRate))
+            SET Gain = Gain + FLOOR(Balance * (banks.InterestRate -1)), Balance = FLOOR(Balance * (banks.InterestRate))
             FROM banks
             WHERE bankaccounts.BankType = banks.ShortName;
         """)
         print(f"Refreshed Wantedness and Alertness at {datetime.datetime.fromtimestamp(current_time)}")
+
+    """class bankinfoview(discord.ui.View):
+        def __init__(self, timeout = 600):
+            super().__init__(timeout=timeout)
+            @discord.ui.button"""
 
 
     @commands.Cog.listener()
@@ -68,17 +74,22 @@ class Economy(commands.Cog):
         user = interaction.user.id
         targetID = target.id
         row = await self.db.fetchone("SELECT LastStealTime FROM econ WHERE UserID = $1", user)
+        if user == targetID:
+            await interaction.response.send_message("You cannot rob yourself", ephemeral=True)
+            return
+        row = await self.db.fetchone("SELECT LastStealTime FROM econ WHERE UserID = ?", (user,))
         laststeal = row[0] if row and row[0] is not None else 0
-        if current_time - laststeal < 60:
+        if current_time - laststeal < 600:
             await interaction.response.send_message("You can chill out on robbing people, y'know?")
             return
         check = await self.db.fetchone("SELECT Balance FROM econ where UserID = $1", targetID)
         check1 = await self.db.fetchone("SELECT Wantedness FROM econ where UserID = $1", user)
         check1 = check1[0] if check1 else 0
+        chance = random.randint(1,7)
         if check == None:
             await interaction.response.send_message(content="The User does not have an open account")
             return
-        if check1 >=5:
+        if check1 >=5 or chance > check1:
             await interaction.response.send_message(content="Oopsie! You got caught ^^")
             await self.db.write("UPDATE econ SET Wantedness = Wantedness + 5 WHERE UserID = $1", current_time)
             return
@@ -86,8 +97,7 @@ class Economy(commands.Cog):
         if stealbal <= 0:
             await interaction.response.send_message(content="They're broke, sadly", ephemeral=True)
             return
-        
-        stealbal = math.floor(stealbal/25 if stealbal/25 < 100000 else 100000)
+        stealbal = math.floor(stealbal/25 if stealbal/25 < 10000 else 10000)
         reason1 = f"Balance stolen by {user}"
         reason2 = f"Balance stolen from {targetID}"
         await self.db.change_balance(targetID, -stealbal, reason1, current_time)
@@ -95,21 +105,27 @@ class Economy(commands.Cog):
         await self.db.write("UPDATE econ SET LastStealTime = $1, Wantedness = Wantedness + 3 WHERE UserID = $2", current_time, user)
         await interaction.response.send_message(content=f"Stole {stealbal} from {target.name}")
 
-
-
     @app_commands.autocomplete(bank = shared_bank_autocomplete)
     @app_commands.command(name="ichiheist", description="Attempt to rob a bank account for Ichicoins")
     async def ichiheist(self, interaction: discord.Interaction, bank: str, user: discord.User):
         print(f"User {interaction.user.id} is attempting to rob {user.id}'s bank account at {bank}")
         target = await self.db.fetchone("SELECT u.UserID, ba.Balance, u.Alertness, b.SecurityModifier FROM bankaccounts ba INNER JOIN banks b ON ba.BankType = b.ShortName INNER JOIN econ u ON ba.UserID = u.UserID WHERE u.UserID = $1 AND b.ShortName = $2", user.id, bank)
+        if interaction.user.id == user.id:
+            await interaction.response.send_message("You cannot heist yourself", ephemeral=True)
+            return
+        target = await self.db.fetchone("SELECT u.UserID, ba.Balance, u.Alertness, b.SecurityModifier FROM bankaccounts ba INNER JOIN banks b ON ba.BankType = b.ShortName INNER JOIN econ u ON ba.UserID = u.UserID WHERE u.UserID = ? AND b.ShortName = ?", (user.id, bank))
         print(target)
         robber = await self.db.fetchone("SELECT u.Wantedness, u.LuckModifier FROM econ u WHERE u.UserID = $1", interaction.user.id)
+        robber = await self.db.fetchone("SELECT u.Wantedness, u.Luck FROM econ u WHERE u.UserID = ?", (interaction.user.id,))
         print(robber)   
         assetchance = random.randint(1, 10)
         if robber[0] >= 7 or robber[0] >= assetchance :
             await interaction.response.send_message(content=f"FREEZE! THIS IS AN ASSET FREEZE!", ephemeral=True) 
             await self.db.write("DELETE FROM bankaccounts WHERE UserID = $1", interaction.user.id)
             await self.db.write("UPDATE econ SET balance = FLOOR(balance/2) WHERE UserID = $1", interaction.user.id)
+            await interaction.response.send_message(content=f"FREEZE! THIS IS AN ASSET Seizure!", ephemeral=True) 
+            await self.db.write("DELETE FROM bankaccounts WHERE UserID = ?",(interaction.user.id,))
+            await self.db.write("UPDATE econ SET balance = FLOOR(balance/2) WHERE UserID = ?",(interaction.user.id,) )
             return
         if target is None:
             await interaction.response.send_message(content="The user does not have an account with that bank.", ephemeral=True)
@@ -122,16 +138,17 @@ class Economy(commands.Cog):
         robber[0] = Wantedness 
         target[3] = SecurityModifier
         """
+
         print("Ok it got here")
         base_chance = 25
         target_defense = target[2] + target[3] 
-        chance = base_chance - (target_defense * 3) - (robber[0] * 2) + (robber[1] * 4)
+        chance = base_chance - (target_defense * 3) - (robber[0] * 4) + (robber[1] * 2)
         chance = max(5, min(45, chance))
         print(chance)
         roll = random.randint(1, 50)
         if roll <= chance:
             robamount = math.floor(target[1] * random.uniform(0.2, 0.3))
-            await self.db.bank_deposit(user.id, -robamount, int(time.time()), bank,1)
+            await self.db.write("UPDATE bankaccounts SET Balance = Balance - ?, Loss = Loss + ? WHERE UserID = ? AND BANKTYPE = ?", (robamount,robamount,user.id, bank))
             await self.db.change_balance(interaction.user.id, robamount, f"Bank Heist from {target[0]}", int(time.time()))
             await interaction.response.send_message(content=f"Successfully robbed {robamount} from {user.name}'s bank account at {bank}!")
             await self.db.write("UPDATE econ SET Wantedness = Wantedness + 1 WHERE UserID = $1", interaction.user.id)
@@ -144,6 +161,7 @@ class Economy(commands.Cog):
     async def ichiportfolio(self, interaction: discord.Interaction):
         await interaction.response.defer()
         print("Hi")
+        current_time = int(time.time())
         user = interaction.user.id
         balance_row = await self.db.fetchone(
             "SELECT Balance FROM econ WHERE UserID = $1",
@@ -161,15 +179,30 @@ class Economy(commands.Cog):
         )
         banklist = ""
         sum = 0
-        for i in ["LNC", "MMS", "RDI", "BWS", "UC25"]:
+        print("Starting bank balance retrieval...")
+        banks = ["LNC", "MMS", "RDI", "BWS", "UC25"]
+        emoji = ["<:LeoNeed:1484485476151722026>","<:MoreMoreJump:1484485534310076556>","<:VividBadSquad:1484485562525286400>","<:WonderlandsShowtime:1484485593470599218>","<:Nightcord:1484485627494924411>"]
+        for j in range(len(banks)):
+            i = banks[j]
             balance = await self.db.fetchone(
                 "SELECT Balance FROM bankaccounts WHERE UserID = $1 AND BankType = $2",
                 user, i
+                "SELECT Balance, Gain, LastDepositTime FROM bankaccounts WHERE UserID = ? AND BankType = ?",
+                (user, i)
             )
-            balance = 0 if balance is None else balance[0]
-            strings = f"**{i}** balance: {balance}"
+            bankbalance = 0 if balance is None else balance[0]
+            gain = 0 if balance is None else balance[1]
+            last_deposit_time = 0 if balance is None else balance[2]
+            strings = f"{emoji[j]} **{i}** balance: {bankbalance}"
+            if gain > 0:
+                min_time = await self.db.fetchone("SELECT WithdrawalFee, MinimumDepositTime FROM banks WHERE ShortName = ?", (i,))
+                fee, min_time = min_time if min_time else (0,0)
+                if current_time - last_deposit_time <= min_time:
+                    strings += f"\nGained {gain} withdrawable in {format_timespan(min_time -(current_time - last_deposit_time))}"
+                else:
+                    strings += f"\nGained {gain} ready to withdraw with a total withdrawal fee of {int(bankbalance*fee)}"
             banklist = banklist + f"\n{strings}"
-            sum += balance
+            sum += bankbalance
         banklist = banklist + f"\nTotal Balance within Banks: {sum}"
         embed.add_field(name="Current Bank Balances",value=banklist)
         wanted = await self.db.fetchone("SELECT Wantedness FROM econ WHERE UserID = $1", interaction.user.id)
@@ -266,7 +299,7 @@ class Economy(commands.Cog):
                     f"{sign}{change:>9,} "
                     f"{after:>12,}\n"
                 )
-            history = history[:1000]  # Truncate to fit within Discord's embed field limit
+            history = history[:1000] 
             history += "```"
             embed.add_field(
                 name="Recent Transactions",     
@@ -328,25 +361,111 @@ class Economy(commands.Cog):
     @app_commands.autocomplete(bank = shared_bank_autocomplete)
     @app_commands.command(name="ichideposit", description="Deposits a select number of Ichicoins to a bank of your choosing")
     async def ichideposit(self, interaction: discord.Interaction, bank: str, amount: int):
+        if 0 >= amount:
+            await interaction.response.send_message("You can't deposit a negative amount, you know?",ephemeral=True)
+            return
+        currentwallet = await self.db.fetchone("SELECT Balance FROM econ WHERE UserID = ?", (interaction.user.id,))
+        mindeposit = await self.db.fetchone("SELECT MinimumDeposit FROM banks WHERE ShortName = ?", (bank,))
+        mindeposit = mindeposit[0] if mindeposit else 0
+        currentwallet = currentwallet[0] if currentwallet else 0
+        if currentwallet < amount:
+            await interaction.response.send_message("You don't have enough Ichicoins to deposit that much.",ephemeral=True)
+            return
+        if mindeposit > amount:
+            await interaction.response.send_message(f"You need atleast {mindeposit} Ichicoins in a single deposit to continue with your transaction to {bank}" ,ephemeral=True)
+            return
         current_time = int(time.time())
         user = interaction.user.id
         result = await self.db.bank_deposit(userID=user, deposit=amount, currenttime=current_time, bank=bank, isRob=0)
         if isinstance(result, DatabaseError):
             await interaction.response.send_message(str(result), ephemeral=True)
+        values = await self.db.fetchone("SELECT * FROM bankaccounts WHERE BankType = ? AND UserID = ?", (bank, interaction.user.id))
+        if not values:
+            await self.db.write("INSERT INTO bankaccounts (UserID, Balance, BankType, LastDepositTime) VALUES (?,?,?,?)", (interaction.user.id,amount,bank,current_time ))
         else:
-            await interaction.response.send_message(f"Successfully deposited {amount} to {bank}.", ephemeral=True)
+            await self.db.write("UPDATE bankaccounts SET Balance = Balance + ?, LastDepositTime = ? WHERE BankType = ? AND UserID = ?", (amount,current_time,bank,interaction.user.id))
+        await self.db.change_balance(interaction.user.id, -amount, f"Deposited into {bank}", current_time)
+        await interaction.response.send_message(f"Successfully deposited {amount} to you account in {bank}",ephemeral=True)
 
     @app_commands.autocomplete(bank = shared_bank_autocomplete)
     @app_commands.command(name="ichiwithdraw", description="Withdraws a select number of Ichicoins from a bank of your choosing")
     async def ichiwithdraw(self, interaction: discord.Interaction, bank: str, amount: int):
-        amount = -amount
         current_time = int(time.time())
         user = interaction.user.id
         result = await self.db.bank_deposit(userID=user, deposit=amount, currenttime=current_time, bank=bank, isRob=0)
         if isinstance(result, DatabaseError):
             await interaction.response.send_message(str(result), ephemeral=True)
+        if 0 >= amount:
+            await interaction.response.send_message("You cannot withdraw a negative amount", ephemeral=True)
+        bankdata = await self.db.fetchall("SELECT WithdrawalFee, MinimumDepositTime FROM banks WHERE ShortName = ?", (bank,))
+        print(bankdata)
+        fee, mintime = bankdata[0] if bankdata else (0,0)
+        print("Here?")
+        checkif = await self.db.fetchone("SELECT Balance, LastDepositTime FROM bankaccounts WHERE UserID = ? AND BankType = ?", (user, bank))
+        print(checkif)
+        if not checkif:
+            await interaction.response.send_message(f"You do not have an account tied to the bank {bank}", ephemeral=True)
+            return
         else:
-            await interaction.response.send_message(f"Successfully deposited {amount} to {bank}.", ephemeral=True)
+            bankbalance, lastdeposit = checkif[0], checkif[1]
+        print("Here?")
+        checkif = await self.db.fetchone("SELECT Balance FROM econ WHERE UserID = ?",(user,))
+        print(checkif)
+        balance = checkif[0] if checkif else 0
+        print(balance)
+        if amount > bankbalance: 
+            await interaction.response.send_message("You dont have enough money in your bank account to withdraw that much", ephemeral= True)
+            return
+        if int(amount * fee) > balance:
+            await interaction.response.send_message(f"You don't have enough money in your account to pay the withdrawal fee of {int(amount*fee)}", ephemeral=True)
+            return
+        if current_time - lastdeposit < mintime:
+            await interaction.response.send_message(f"Please wait {format_timespan(mintime-current_time + lastdeposit)} to withdraw from {bank}", ephemeral=True)
+            return
+        await self.db.write("UPDATE bankaccounts SET Balance = Balance - ?, LastDepositTime = ? WHERE BankType = ? AND UserID = ?", (amount,current_time,bank,interaction.user.id))
+        await self.db.change_balance(interaction.user.id, +amount, f"Withdrew from {bank}", current_time)
+        await self.db.change_balance(interaction.user.id, -(int(amount*fee)), f"Paid fee to {bank}", current_time)
+        if amount == bankbalance:
+            await self.db.write("DELETE FROM bankaccounts WHERE UserID = ? AND BankType = ?",(user,bank))
+        await interaction.response.send_message(f"{bank} would like to thank you for choosing them. {amount} Ichcicoins have been withdrawn from your bank accout with a fee of {amount*fee}.")
+             
+    @app_commands.autocomplete(bank=shared_bank_autocomplete)
+    @app_commands.command(name="ichibankinfo", description="Displays your current Ichicoins balance")
+    async def ichibankinfo(self, interaction: discord.Interaction, bank: str):
+        bankdata =  await self.db.fetchall("SELECT * FROM banks WHERE ShortName = ?", (bank,))
+        print(bankdata)
+        if not bankdata:
+            await interaction.response.send_message("Bank does not exist", ephemeral=True)
+            return
+        else:
+            bankdata = bankdata[0]
+        embed = discord.Embed(
+            color=discord.Color.from_str(bankdata[9]),
+            title=bankdata[0],
+            description=f"_{bankdata[8]}_"
+        )
+        embed.set_thumbnail(url=bankdata[10])
+        embed.add_field(name="Initialism", value=bankdata[1])
+        print(
+            f"{(bankdata[2] - 1) * 100:.3f}%/Hour; {(bankdata[2] ** 24 - 1) * 100:.3f}%/day"
+        )
+        embed.add_field(name="Interest Rate", value=f"{(bankdata[2] - 1) * 100:.3f}%/Hour; {(bankdata[2] ** 24 - 1) * 100:.3f}%/day")
+        embed.add_field(name="Withdrawal Fee", value=f"{(bankdata[3])*100}% of withdraw amount")
+        embed.add_field(name="Minimum Deposit", value=bankdata[4])
+        
+        if bankdata[5] < 0:
+            sec = "☆" * -bankdata[5]
+        elif bankdata[5] == 0:
+            sec = "--:--"
+        else:
+            sec = "★" * bankdata[5]
+    
+        embed.add_field(name="Security Quality", value=sec)
+        embed.add_field(name="Lock In Period", value=f"{format_timespan( bankdata[6])}")
+        await interaction.response.send_message(embed=embed)
+     
+    """@app_commands.command(name="ichiwork", description="Work to earn Ichicoins. Join the Ichiworkforce.")
+    async def ichiwork(self, interaction: discord.Interaction):"""
 
     @app_commands.command(name="ichitransfer", description="Transfers a select number of Ichicoins to a user of your choosing")
     async def ichitransfer(self, interaction: discord.Interaction, user: discord.User, amount: int):
@@ -389,13 +508,14 @@ class Economy(commands.Cog):
         await self.db.write("UPDATE econ SET Alertness = Alertness - 1 WHERE Alertness > 0")
         await self.db.write("""
             UPDATE bankaccounts
-            SET Balance = FLOOR(Balance * (banks.InterestRate))
+            SET Gain = Gain + FLOOR(Balance * (banks.InterestRate -1)), Balance = FLOOR(Balance * (banks.InterestRate))
             FROM banks
             WHERE bankaccounts.BankType = banks.ShortName;
         """)
 
         print(f"Forced economy tick at {datetime.datetime.fromtimestamp(int(time.time()))}")
         await interaction.response.send_message("Economy tick forced successfully.", ephemeral=True)
+
 
 async def setup(bot):
     await bot.add_cog(Economy(bot))
